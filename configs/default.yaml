@@ -1,0 +1,30 @@
+run:
+  output_root: outputs
+  duration_s: 10.0
+  dt_s: 0.1
+  seed: 42
+  scenario_id: forest_edge_baseline
+
+sensors:
+  stereo_width: 1280
+  stereo_height: 720
+  up_width: 1024
+  up_height: 1024
+  imu_hz: 200
+  cam_hz: 30
+
+scene:
+  map_name: forest_edge
+  area_radius_m: 100.0
+  min_altitude_m: 25.0
+  max_altitude_m: 60.0
+
+geo:
+  origin_lat_deg: 30.515
+  origin_lon_deg: 114.334
+  origin_alt_m: 48.0
+
+polarization:
+  lib_radtran_bin: /opt/libRadtran/bin/uvspec
+  solar_wavelength_nm: 550
+  dolp_clip: 1.0
