@@ -18,6 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.5"]
+ros = ["rosbags>=0.10"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
