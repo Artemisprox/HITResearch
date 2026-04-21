@@ -30,7 +30,23 @@ python scripts/visualize_dataset.py \
   --save outputs/forest_edge_baseline/run_000/preview.png
 ```
 
-## 5) 接入 Isaac Sim / Pegasus
+## 5) 导出 RViz 可演示的 rosbag2
+```bash
+pip install -e '.[ros]'
+python scripts/demo_to_rviz_bag.py --config configs/default.yaml --run-idx 0
+```
+默认会在对应 run 目录下生成 `rviz_demo_bag/`，包含：
+- `/hitresearch/path` (`nav_msgs/msg/Path`)
+- `/hitresearch/pose` (`geometry_msgs/msg/PoseStamped`)
+- `/imu/data` (`sensor_msgs/msg/Imu`)
+
+在 ROS 2 环境中可执行：
+```bash
+ros2 bag play outputs/<scenario_id>/run_000/rviz_demo_bag
+```
+再打开 RViz 订阅上述话题进行轨迹与姿态演示。
+
+## 6) 接入 Isaac Sim / Pegasus
 当前 `ForestScene` 与各 `Sensor` 是 mock 接口：
 - 把 `scenes/forest_scene.py` 的 `load()` 替换为实际 USD 场景加载
 - 把 `sensors/*.py` 的 `capture()/sample()` 替换为 Pegasus 传感器 API
