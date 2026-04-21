@@ -46,6 +46,11 @@ ros2 bag play outputs/<scenario_id>/run_000/rviz_demo_bag
 ```
 再打开 RViz 订阅上述话题进行轨迹与姿态演示。
 
+若本机 `rosbags` 版本要求显式传入 `Writer` 的 `version` 参数，可用：
+```bash
+python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
+```
+
 ## 6) 接入 Isaac Sim / Pegasus
 当前 `ForestScene` 与各 `Sensor` 是 mock 接口：
 - 把 `scenes/forest_scene.py` 的 `load()` 替换为实际 USD 场景加载

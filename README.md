@@ -34,6 +34,11 @@ python scripts/demo_to_rviz_bag.py --config configs/default.yaml --run-idx 0
 - 再导出 `rviz_demo_bag/`（话题：`/hitresearch/path`、`/hitresearch/pose`、`/imu/data`）
 - 可在 ROS 2 中 `ros2 bag play <bag_dir>`，然后用 RViz 订阅上述话题演示飞行轨迹
 
+如遇 `Writer.__init__() missing ... 'version'` 或版本兼容问题，可显式指定：
+```bash
+python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
+```
+
 ## 输出
 每个 run 输出一个 `dataset.csv`，包含：
 - 轨迹/姿态真值（`t/x/y/z/yaw_deg`）

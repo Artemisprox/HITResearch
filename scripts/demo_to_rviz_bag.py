@@ -32,6 +32,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Overwrite existing bag directory if it already exists",
     )
+    parser.add_argument(
+        "--bag-version",
+        type=int,
+        default=9,
+        help="rosbag2 storage format version passed to rosbags Writer (default: 9)",
+    )
     return parser.parse_args()
 
 
@@ -46,7 +52,12 @@ def _to_time(t: float, time_type: Any) -> Any:
     return time_type(sec=sec, nanosec=nanosec)
 
 
-def export_dataset_to_bag(dataset_dir: Path, bag_dir: Path, overwrite: bool = False) -> Path:
+def export_dataset_to_bag(
+    dataset_dir: Path,
+    bag_dir: Path,
+    overwrite: bool = False,
+    bag_version: int = 9,
+) -> Path:
     try:
         from rosbags.rosbag2 import Writer
         from rosbags.typesys import Stores, get_typestore
@@ -78,7 +89,7 @@ def export_dataset_to_bag(dataset_dir: Path, bag_dir: Path, overwrite: bool = Fa
     Imu = typestore.types["sensor_msgs/msg/Imu"]
     PathMsg = typestore.types["nav_msgs/msg/Path"]
 
-    with Writer(str(bag_dir)) as writer:
+    with Writer(str(bag_dir), version=bag_version) as writer:
         imu_conn = writer.add_connection("/imu/data", "sensor_msgs/msg/Imu", typestore=typestore)
         pose_conn = writer.add_connection(
             "/hitresearch/pose", "geometry_msgs/msg/PoseStamped", typestore=typestore
@@ -148,7 +159,12 @@ def main() -> None:
         run_dir = pipeline.run(args.run_idx)
 
     bag_dir = args.bag_dir or (run_dir / "rviz_demo_bag")
-    out = export_dataset_to_bag(run_dir, bag_dir, overwrite=args.overwrite)
+    out = export_dataset_to_bag(
+        run_dir,
+        bag_dir,
+        overwrite=args.overwrite,
+        bag_version=args.bag_version,
+    )
     print(f"dataset source: {run_dir}")
     print(f"rosbag2 written to: {out}")
     print("Use with ROS 2: ros2 bag play <bag_dir>, then open RViz to view /hitresearch/path and /hitresearch/pose")
