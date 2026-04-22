@@ -24,6 +24,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable Isaac Sim GUI mode for scene debugging (requires Isaac environment)",
     )
+    parser.add_argument(
+        "--strict-isaac",
+        action="store_true",
+        help="Fail immediately if Isaac backend is requested but omni modules are unavailable",
+    )
     return parser.parse_args()
 
 
@@ -39,10 +44,16 @@ def main() -> None:
         try:
             from omni.isaac.kit import SimulationApp
         except ImportError as exc:
-            raise RuntimeError(
-                "Isaac simulation requires Isaac Sim Python environment (omni.isaac.kit is missing)."
-            ) from exc
-        sim_app = SimulationApp({"headless": not args.gui})
+            if args.strict_isaac:
+                raise RuntimeError(
+                    "Isaac simulation requires Isaac Sim Python environment (omni.isaac.kit is missing)."
+                ) from exc
+            print("[warn] omni.isaac.kit is missing; fallback to mock backend for this run.")
+            cfg.scene.backend = "mock"
+            cfg.sensors.provider = "mock"
+            need_isaac_app = False
+        else:
+            sim_app = SimulationApp({"headless": not args.gui})
 
     try:
         pipeline = SimulationPipeline(cfg)
