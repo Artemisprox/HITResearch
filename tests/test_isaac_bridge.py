@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 
 from hitresearch_sim.sensors.isaac_bridge import IsaacSensorBridge
 
@@ -32,3 +33,11 @@ def test_bridge_intrinsics_shape() -> None:
     k = bridge.intrinsics()
     assert k["stereo"]["width"] == 80
     assert k["upward"]["width"] == 64
+
+
+def test_to_bgr_validates_input() -> None:
+    with pytest.raises(RuntimeError, match="no image data"):
+        IsaacSensorBridge._to_bgr(None)
+    arr = np.zeros((4, 4, 4), dtype=np.uint8)
+    out = IsaacSensorBridge._to_bgr(arr)
+    assert out.shape == (4, 4, 3)

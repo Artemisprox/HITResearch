@@ -11,8 +11,7 @@ python scripts/run_batch.py --config configs/default.yaml --num-runs 5 --seed 12
 ```
 每次执行会先清理目标 `run_xxx/` 输出目录，再写入新一轮帧数据，避免读取到历史残留帧。
 当前默认是 Isaac 配置（`scene.backend: isaac` + `sensors.provider: isaac`）。
-若当前 Python 环境没有 Isaac 模块，脚本默认会自动回退到 `mock` 并继续跑（会打印 warning）。
-如需强制 Isaac（缺模块就失败），加 `--strict-isaac`。
+若当前 Python 环境没有 Isaac 模块，脚本会直接报错退出（Isaac-only 模式）。
 
 ## 2.1) 调试阶段：启用 Isaac GUI 查看模块
 ```bash
@@ -29,6 +28,8 @@ python scripts/inspect_isaac_setup.py --config configs/default.yaml --gui
 ```
 如果当前环境没有 Isaac Python 模块，脚本会输出预期挂载点和运行指引（默认不报错退出）。
 需要严格失败可加 `--strict`。
+
+若 Isaac 相机桥接未返回有效图像，pipeline 会直接抛错并终止 run，避免产生无效 mock 数据。
 
 ## 3) 输出结构（CSV）
 每个 `run_xxx` 目录包含：

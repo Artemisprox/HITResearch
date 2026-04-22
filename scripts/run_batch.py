@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--strict-isaac",
         action="store_true",
-        help="Fail immediately if Isaac backend is requested but omni modules are unavailable",
+        help="Deprecated: Isaac mode is now strict by default.",
     )
     return parser.parse_args()
 
@@ -38,6 +38,10 @@ def main() -> None:
     cfg = load_config(args.config)
     if args.seed is not None:
         cfg.run.seed = args.seed
+    if cfg.scene.backend != "isaac" or cfg.sensors.provider != "isaac":
+        raise ValueError(
+            "This runner is now Isaac-only. Set scene.backend=isaac and sensors.provider=isaac."
+        )
 
     sim_app = None
     need_isaac_app = cfg.scene.backend == "isaac"
@@ -51,15 +55,10 @@ def main() -> None:
                 from omni.isaac.kit import SimulationApp as _SimulationApp  # backward-compat for older Isaac
                 SimulationApp = _SimulationApp
             except ImportError as exc2:
-                if args.strict_isaac:
-                    raise RuntimeError(
-                        "Isaac simulation requires Isaac Sim Python environment (isaacsim/omni modules missing)."
-                    ) from exc2
-                print("[warn] Isaac modules missing; fallback to mock backend for this run.")
-                cfg.scene.backend = "mock"
-                cfg.sensors.provider = "mock"
-                need_isaac_app = False
-        if need_isaac_app and SimulationApp is not None:
+                raise RuntimeError(
+                    "Isaac simulation requires Isaac Sim Python environment (isaacsim/omni modules missing)."
+                ) from exc2
+        if SimulationApp is not None:
             if args.gui and not os.environ.get("DISPLAY"):
                 print("[warn] DISPLAY is not set; GUI request will run headless. Set DISPLAY for windowed mode.")
             sim_app = SimulationApp({"headless": not args.gui})

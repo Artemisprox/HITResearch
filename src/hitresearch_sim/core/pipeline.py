@@ -75,12 +75,15 @@ class SimulationPipeline:
                 upward_width=self.config.sensors.up_width,
                 upward_height=self.config.sensors.up_height,
             )
+            try:
+                isaac_bridge.warmup()
+            except Exception as exc:
+                raise RuntimeError(f"Isaac sensor warmup failed: {exc}") from exc
             sensor_meta = isaac_bridge.intrinsics()
         else:
-            sensor_meta = {
-                "stereo": self.stereo.intrinsics(),
-                "upward": self.up_cam.intrinsics(),
-            }
+            raise RuntimeError(
+                "Isaac simulation requires sensors.provider=isaac. Mock sensor path is disabled for this runner."
+            )
 
         writer = DatasetWriter(out_dir, sensor_meta=sensor_meta)
         points = self.traj.circular(self.config.run.duration_s, self.config.run.dt_s)
@@ -93,20 +96,18 @@ class SimulationPipeline:
         for i, p in enumerate(points):
             if isaac_stage is not None and isaac_drone is not None:
                 isaac_drone.set_pose(isaac_stage, p.x, p.y, p.z, p.yaw_deg)
-            if isaac_bridge is not None:
-                try:
-                    import omni.kit.app
-                except ImportError:
-                    pass
-                else:
-                    omni.kit.app.get_app().update()
+            try:
+                import omni.kit.app
+            except ImportError:
+                pass
+            else:
+                omni.kit.app.get_app().update()
+            try:
                 left, right = isaac_bridge.capture_stereo()
                 upward = isaac_bridge.capture_upward()
                 imu = ImuSample(**isaac_bridge.sample_imu())
-            else:
-                left, right = self.stereo.capture()
-                upward = self.up_cam.capture()
-                imu = self.imu.sample()
+            except Exception as exc:
+                raise RuntimeError(f"Isaac sensor capture failed at frame {i}: {exc}") from exc
             sky_mask = self.masker.extract(upward)
             pol = self.compositor.compose(upward, sky_mask, lut)
 

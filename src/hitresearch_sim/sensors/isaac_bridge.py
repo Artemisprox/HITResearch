@@ -23,6 +23,7 @@ class IsaacSensorBridge:
     _up_ann: Any = None
     _imu_sensor: Any = None
     _imu_warned: bool = False
+    _warmed_up: bool = False
 
     def _init_rgb_annotators(self) -> None:
         if self._initialized:
@@ -49,19 +50,42 @@ class IsaacSensorBridge:
 
     @staticmethod
     def _to_bgr(img: np.ndarray) -> np.ndarray:
+        if img is None:
+            raise RuntimeError("Annotator returned no image data.")
         if img.ndim != 3:
             raise ValueError(f"Unexpected annotator image shape: {img.shape}")
         rgb = img[..., :3].astype(np.uint8)
+        if rgb.size == 0:
+            raise RuntimeError("Annotator returned empty image data.")
         return rgb[..., ::-1]
 
-    def capture_stereo(self) -> tuple[np.ndarray, np.ndarray]:
+    def warmup(self, steps: int = 4) -> None:
+        if self._warmed_up:
+            return
         self._init_rgb_annotators()
+        try:
+            import omni.kit.app
+        except ImportError:
+            self._warmed_up = True
+            return
+
+        app = omni.kit.app.get_app()
+        for _ in range(max(steps, 1)):
+            app.update()
+        # Validate one fetch to ensure render products are alive.
+        _ = self._to_bgr(self._left_ann.get_data())
+        _ = self._to_bgr(self._right_ann.get_data())
+        _ = self._to_bgr(self._up_ann.get_data())
+        self._warmed_up = True
+
+    def capture_stereo(self) -> tuple[np.ndarray, np.ndarray]:
+        self.warmup()
         left = self._to_bgr(self._left_ann.get_data())
         right = self._to_bgr(self._right_ann.get_data())
         return left, right
 
     def capture_upward(self) -> np.ndarray:
-        self._init_rgb_annotators()
+        self.warmup()
         return self._to_bgr(self._up_ann.get_data())
 
     def sample_imu(self) -> dict[str, float]:
