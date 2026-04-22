@@ -34,14 +34,15 @@ def main() -> None:
         cfg.run.seed = args.seed
 
     sim_app = None
-    if args.gui:
+    need_isaac_app = cfg.scene.backend == "isaac"
+    if need_isaac_app:
         try:
             from omni.isaac.kit import SimulationApp
         except ImportError as exc:
             raise RuntimeError(
-                "--gui requires Isaac Sim Python environment (omni.isaac.kit is missing)."
+                "Isaac simulation requires Isaac Sim Python environment (omni.isaac.kit is missing)."
             ) from exc
-        sim_app = SimulationApp({"headless": False})
+        sim_app = SimulationApp({"headless": not args.gui})
 
     try:
         pipeline = SimulationPipeline(cfg)

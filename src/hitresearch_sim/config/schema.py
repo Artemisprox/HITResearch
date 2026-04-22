@@ -6,7 +6,7 @@ from pathlib import Path
 
 @dataclass(slots=True)
 class SensorConfig:
-    provider: str = "mock"
+    provider: str = "isaac"
     stereo_width: int = 1280
     stereo_height: int = 720
     up_width: int = 1024
@@ -18,7 +18,7 @@ class SensorConfig:
 @dataclass(slots=True)
 class SceneConfig:
     map_name: str = "forest_edge"
-    backend: str = "mock"
+    backend: str = "isaac"
     usd_path: Path | None = None
     drone_prim_path: str = "/World/Drone"
     tree_count: int = 80

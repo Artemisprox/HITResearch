@@ -10,7 +10,7 @@ pip install -e .
 python scripts/run_batch.py --config configs/default.yaml --num-runs 5 --seed 123
 ```
 每次执行会先清理目标 `run_xxx/` 输出目录，再写入新一轮帧数据，避免读取到历史残留帧。
-当前默认是 `scene.backend: mock`，图像由程序纹理生成，颜色偏“示意化”用于验证链路，不代表真实渲染风格。
+当前默认是 Isaac 配置（`scene.backend: isaac` + `sensors.provider: isaac`）。
 
 ## 2.1) 调试阶段：启用 Isaac GUI 查看模块
 ```bash
@@ -72,9 +72,9 @@ python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
 如果 `rviz_demo_bag/` 已存在，默认会自动创建 `rviz_demo_bag_001` 等新目录；要覆盖原目录请加 `--overwrite`。
 
 ## 6) 接入 Isaac Sim / Pegasus
-`ForestScene` 现在支持两种后端：
-- `scene.backend: mock`（默认）
-- `scene.backend: isaac`（会实际调用 Isaac Sim 的 `open_stage()` 载入 USD）
+`ForestScene` 支持两种后端：
+- `scene.backend: isaac`（默认，会实际调用 Isaac Sim 的 `open_stage()` 载入 USD）
+- `scene.backend: mock`（用于无 Isaac 依赖的占位测试）
 
 当 `scene.backend: isaac` 且 `scene.usd_path: null` 时，会创建程序化森林环境并自动搭建无人机传感器挂载点：
 - `/World/Drone/stereo_left`
@@ -96,6 +96,6 @@ sensors:
 - 若配置了 `usd_path` 但文件不存在会直接报错
 - 偏振模型实现细节见 `docs/POLARIZATION_MODEL.md`
 
-其余模块仍是 mock 接口，建议逐步替换：
-- 把 `sensors/*.py` 的 `capture()/sample()` 替换为 Pegasus 传感器 API
-- `polarization/lut.py` 中 `build()` 替换为 libRadtran 真实调用与解析
+如需进一步提高真实性，可继续替换：
+- `sensors/isaac_bridge.py` 中 IMU fallback 为确定性 Isaac IMU API
+- `polarization/lut.py` 中 Rayleigh baseline 为 libRadtran 真实调用与解析

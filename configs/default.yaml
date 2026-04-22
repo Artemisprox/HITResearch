@@ -6,7 +6,7 @@ run:
   scenario_id: forest_edge_baseline
 
 sensors:
-  provider: mock
+  provider: isaac
   stereo_width: 1280
   stereo_height: 720
   up_width: 1024
@@ -16,7 +16,7 @@ sensors:
 
 scene:
   map_name: forest_edge
-  backend: mock
+  backend: isaac
   usd_path: null
   drone_prim_path: /World/Drone
   tree_count: 80

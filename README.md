@@ -17,7 +17,7 @@ python scripts/run_batch.py --config configs/default.yaml --num-runs 2 --seed 42
 ```
 `run_batch.py` 现在会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致“看起来还是旧的黑图”。
 
-> 若你看到图像“颜色不真实”，这是因为当前默认 `mock` 传感器是程序生成纹理（用于调试数据链路），不是真实渲染输出。
+> 默认配置已切到 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
 
 ## 快速可视化 demo
 ```bash
@@ -33,7 +33,7 @@ pip install -e '.[ros]'
 python scripts/demo_to_rviz_bag.py --config configs/default.yaml --run-idx 0
 ```
 该脚本会：
-- 先跑一次 mock 仿真并生成 `dataset.csv`
+- 先跑一次仿真并生成 `dataset.csv`
 - 再导出 `rviz_demo_bag/`（话题：`/hitresearch/path`、`/hitresearch/pose`、`/imu/data`）
 - 可在 ROS 2 中 `ros2 bag play <bag_dir>`，然后用 RViz 订阅上述话题演示飞行轨迹
 
@@ -62,7 +62,7 @@ python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
 - `scripts`：批处理入口与可视化脚本
 
 ## 说明
-当前版本提供可运行工程框架与 mock 管线，并支持通过 `scene.backend: isaac` + `scene.usd_path` 直接加载森林 USD 场景。
+当前版本默认即为 Isaac 仿真链路，并支持通过 `scene.usd_path` 加载森林 USD 场景。
 当 `scene.backend: isaac` 且 `scene.usd_path` 为空时，会自动生成程序化森林（地面+树木）并创建带双目/上视/IMU 挂载点的无人机 prim，便于先做可视化调试。
 
 ## 调试阶段可视化（Isaac GUI）

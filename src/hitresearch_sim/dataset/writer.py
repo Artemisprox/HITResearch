@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import cv2
 import numpy as np
 
 
@@ -20,6 +19,8 @@ class DatasetWriter:
                 json.dump(sensor_meta, f, ensure_ascii=False, indent=2)
 
     def write_frame(self, idx: int, payload: dict[str, Any]) -> None:
+        import cv2
+
         frame_dir = self.root / f"frame_{idx:06d}"
         frame_dir.mkdir(parents=True, exist_ok=True)
 
