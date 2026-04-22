@@ -52,6 +52,7 @@ def main() -> None:
     _flush_report(report_path, report)
 
     sim_app = None
+    bridge = None
     try:
         from hitresearch_sim.config.loader import load_config
         from hitresearch_sim.scenes.forest_scene import ForestScene
@@ -103,6 +104,17 @@ def main() -> None:
             raise RuntimeError(f"Missing sensor prims: {missing}")
         _step(report, report_path, "prim_check", "ok", "All expected sensor prims exist", prims=expected_prims)
 
+        from pxr import UsdGeom
+
+        camera_checks = {}
+        for p in expected_prims[:-1]:
+            prim = stage.GetPrimAtPath(p)
+            camera_checks[p] = {
+                "type_name": prim.GetTypeName(),
+                "is_camera": prim.IsA(UsdGeom.Camera),
+            }
+        _step(report, report_path, "camera_schema", "ok", "Checked camera prim schemas", cameras=camera_checks)
+
         bridge = IsaacSensorBridge(
             stereo_left_prim=f"{base}/stereo_left",
             stereo_right_prim=f"{base}/stereo_right",
@@ -138,7 +150,8 @@ def main() -> None:
         report["ok"] = True
     except Exception as exc:
         tb = traceback.format_exc()
-        _step(report, report_path, "exception", "error", str(exc), traceback=tb)
+        bridge_diag = bridge.diagnostics() if bridge is not None else None
+        _step(report, report_path, "exception", "error", str(exc), traceback=tb, bridge=bridge_diag)
         report["ok"] = False
     finally:
         if sim_app is not None:

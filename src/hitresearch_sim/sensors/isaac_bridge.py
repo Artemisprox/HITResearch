@@ -24,6 +24,7 @@ class IsaacSensorBridge:
     _imu_sensor: Any = None
     _imu_warned: bool = False
     _warmed_up: bool = False
+    _attach_records: list[dict[str, str]] | None = None
 
     @staticmethod
     def _extract_array(data: Any) -> np.ndarray:
@@ -62,13 +63,52 @@ class IsaacSensorBridge:
         right_rp = rep.create.render_product(self.stereo_right_prim, (self.stereo_width, self.stereo_height))
         up_rp = rep.create.render_product(self.upward_prim, (self.upward_width, self.upward_height))
 
-        self._left_ann = rep.AnnotatorRegistry.get_annotator("rgb")
-        self._right_ann = rep.AnnotatorRegistry.get_annotator("rgb")
-        self._up_ann = rep.AnnotatorRegistry.get_annotator("rgb")
-        self._left_ann.attach([left_rp])
-        self._right_ann.attach([right_rp])
-        self._up_ann.attach([up_rp])
+        self._attach_records = []
+        self._left_ann = self._attach_annotator(rep, left_rp, "stereo_left")
+        self._right_ann = self._attach_annotator(rep, right_rp, "stereo_right")
+        self._up_ann = self._attach_annotator(rep, up_rp, "upward")
         self._initialized = True
+
+    @staticmethod
+    def _render_product_path(render_product: Any) -> str:
+        if isinstance(render_product, str):
+            return render_product
+        path = getattr(render_product, "path", None)
+        if isinstance(path, str):
+            return path
+        return str(render_product)
+
+    def _attach_annotator(self, rep: Any, render_product: Any, label: str) -> Any:
+        rp_path = self._render_product_path(render_product)
+        attempts: list[tuple[str, list[Any]]] = [
+            ("rgb", [render_product]),
+            ("rgb", [rp_path]),
+            ("LdrColor", [render_product]),
+            ("LdrColor", [rp_path]),
+        ]
+        errors: list[str] = []
+        for annotator_name, target in attempts:
+            try:
+                ann = rep.AnnotatorRegistry.get_annotator(annotator_name)
+                ann.attach(target)
+            except Exception as exc:
+                errors.append(f"{annotator_name}@{type(target[0]).__name__}:{exc}")
+                continue
+
+            if self._attach_records is not None:
+                self._attach_records.append(
+                    {
+                        "sensor": label,
+                        "annotator": annotator_name,
+                        "target_type": type(target[0]).__name__,
+                        "target": str(target[0]),
+                    }
+                )
+            return ann
+
+        raise RuntimeError(
+            f"Failed to attach annotator for {label} (render_product={rp_path}). Attempts: {' | '.join(errors)}"
+        )
 
     @staticmethod
     def _update_app_once() -> None:
@@ -190,4 +230,13 @@ class IsaacSensorBridge:
                 "cy": float((self.upward_height - 1) * 0.5),
                 "fov_deg": 180.0,
             },
+        }
+
+    def diagnostics(self) -> dict[str, Any]:
+        return {
+            "stereo_left_prim": self.stereo_left_prim,
+            "stereo_right_prim": self.stereo_right_prim,
+            "upward_prim": self.upward_prim,
+            "imu_prim": self.imu_prim,
+            "attach_records": self._attach_records or [],
         }

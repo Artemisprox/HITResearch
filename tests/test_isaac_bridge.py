@@ -81,3 +81,19 @@ def test_read_bgr_with_retries_eventually_succeeds(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(IsaacSensorBridge, "_update_app_once", staticmethod(lambda: None))
     out = bridge._read_bgr_with_retries(_Ann(), "test", retries=4)
     assert out.shape == (2, 2, 3)
+
+
+def test_bridge_diagnostics_contains_prim_paths() -> None:
+    bridge = IsaacSensorBridge(
+        stereo_left_prim="/World/Drone/stereo_left",
+        stereo_right_prim="/World/Drone/stereo_right",
+        upward_prim="/World/Drone/upward_cam",
+        imu_prim="/World/Drone/imu",
+        stereo_width=64,
+        stereo_height=48,
+        upward_width=64,
+        upward_height=64,
+    )
+    diag = bridge.diagnostics()
+    assert diag["stereo_left_prim"] == "/World/Drone/stereo_left"
+    assert isinstance(diag["attach_records"], list)
