@@ -12,7 +12,7 @@ from hitresearch_sim.polarization.lut import LibRadtranLUTBuilder
 from hitresearch_sim.polarization.sky_mask import SkyMaskExtractor
 from hitresearch_sim.scenes.forest_scene import ForestScene
 from hitresearch_sim.scenes.trajectory import TrajectoryGenerator
-from hitresearch_sim.sensors.imu import ImuSensor
+from hitresearch_sim.sensors.imu import ImuSample, ImuSensor
 from hitresearch_sim.sensors.stereo import StereoSensor
 from hitresearch_sim.sensors.upward_camera import UpwardCamera
 
@@ -24,6 +24,9 @@ class SimulationPipeline:
             config.scene.map_name,
             backend=config.scene.backend,
             usd_path=config.scene.usd_path,
+            area_radius_m=config.scene.area_radius_m,
+            tree_count=config.scene.tree_count,
+            drone_prim_path=config.scene.drone_prim_path,
         )
         self.traj = TrajectoryGenerator(
             radius_m=config.scene.area_radius_m,
@@ -46,14 +49,53 @@ class SimulationPipeline:
             shutil.rmtree(out_dir)
         writer = DatasetWriter(out_dir)
 
-        self.scene.load()
+        scene_meta = self.scene.load()
+        isaac_stage = None
+        isaac_drone = None
+        if scene_meta.get("backend") == "isaac":
+            try:
+                import omni.usd
+                from hitresearch_sim.platforms.isaac_drone import IsaacDroneRig
+            except ImportError:
+                isaac_stage = None
+            else:
+                isaac_stage = omni.usd.get_context().get_stage()
+                isaac_drone = IsaacDroneRig(prim_path=self.config.scene.drone_prim_path)
+        isaac_bridge = None
+        if scene_meta.get("backend") == "isaac" and self.config.sensors.provider == "isaac":
+            from hitresearch_sim.sensors.isaac_bridge import IsaacSensorBridge
+
+            base = self.config.scene.drone_prim_path
+            isaac_bridge = IsaacSensorBridge(
+                stereo_left_prim=f"{base}/stereo_left",
+                stereo_right_prim=f"{base}/stereo_right",
+                upward_prim=f"{base}/upward_cam",
+                imu_prim=f"{base}/imu",
+                stereo_width=self.config.sensors.stereo_width,
+                stereo_height=self.config.sensors.stereo_height,
+                upward_width=self.config.sensors.up_width,
+                upward_height=self.config.sensors.up_height,
+            )
         points = self.traj.circular(self.config.run.duration_s, self.config.run.dt_s)
         lut = self.lut_builder.build(solar_zenith_deg=40.0, solar_azimuth_deg=140.0, out_dir=out_dir)
 
         for i, p in enumerate(points):
-            left, right = self.stereo.capture()
-            upward = self.up_cam.capture()
-            imu = self.imu.sample()
+            if isaac_stage is not None and isaac_drone is not None:
+                isaac_drone.set_pose(isaac_stage, p.x, p.y, p.z, p.yaw_deg)
+            if isaac_bridge is not None:
+                try:
+                    import omni.kit.app
+                except ImportError:
+                    pass
+                else:
+                    omni.kit.app.get_app().update()
+                left, right = isaac_bridge.capture_stereo()
+                upward = isaac_bridge.capture_upward()
+                imu = ImuSample(**isaac_bridge.sample_imu())
+            else:
+                left, right = self.stereo.capture()
+                upward = self.up_cam.capture()
+                imu = self.imu.sample()
             sky_mask = self.masker.extract(upward)
             pol = self.compositor.compose(upward, sky_mask, lut)
 

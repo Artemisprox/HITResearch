@@ -10,6 +10,9 @@ class ForestScene:
     map_name: str
     backend: str = "mock"
     usd_path: Path | None = None
+    area_radius_m: float = 100.0
+    tree_count: int = 80
+    drone_prim_path: str = "/World/Drone"
 
     def load(self) -> dict[str, Any]:
         if self.backend == "mock":
@@ -19,9 +22,7 @@ class ForestScene:
         return self._load_isaac_scene()
 
     def _load_isaac_scene(self) -> dict[str, Any]:
-        if self.usd_path is None:
-            raise ValueError("scene.usd_path is required when scene.backend == 'isaac'")
-        if not self.usd_path.exists():
+        if self.usd_path is not None and not self.usd_path.exists():
             raise FileNotFoundError(f"Scene USD file not found: {self.usd_path}")
 
         try:
@@ -33,17 +34,38 @@ class ForestScene:
                 "or switch scene.backend to 'mock'."
             ) from exc
 
-        ok = open_stage(str(self.usd_path))
-        if not ok:
-            raise RuntimeError(f"Failed to open USD stage: {self.usd_path}")
+        usd_ctx = omni.usd.get_context()
+        loaded_from_file = False
+        if self.usd_path is not None:
+            ok = open_stage(str(self.usd_path))
+            if not ok:
+                raise RuntimeError(f"Failed to open USD stage: {self.usd_path}")
+            loaded_from_file = True
+        else:
+            usd_ctx.new_stage()
 
-        stage = omni.usd.get_context().get_stage()
+        stage = usd_ctx.get_stage()
         if stage is None:
-            raise RuntimeError(f"USD stage context is empty after loading: {self.usd_path}")
+            raise RuntimeError("USD stage context is empty after scene setup")
+
+        from hitresearch_sim.platforms.isaac_drone import IsaacDroneRig
+        from hitresearch_sim.scenes.procedural_forest import build_procedural_forest
+
+        forest_meta: dict[str, Any] = {}
+        if not loaded_from_file:
+            forest_meta = build_procedural_forest(
+                stage=stage,
+                root_path="/World/Forest",
+                area_radius_m=self.area_radius_m,
+                tree_count=self.tree_count,
+            )
+        drone_meta = IsaacDroneRig(prim_path=self.drone_prim_path).create(stage)
 
         return {
             "backend": "isaac",
             "map_name": self.map_name,
-            "usd_path": str(self.usd_path),
+            "usd_path": str(self.usd_path) if self.usd_path is not None else None,
             "stage_id": stage.GetRootLayer().identifier,
+            "forest": forest_meta,
+            "drone": drone_meta,
         }

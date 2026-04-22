@@ -12,9 +12,9 @@ def test_mock_scene_load_returns_metadata() -> None:
     assert meta["map_name"] == "forest_edge"
 
 
-def test_isaac_scene_requires_usd_path() -> None:
+def test_isaac_scene_requires_isaac_modules_if_no_usd_path() -> None:
     scene = ForestScene(map_name="forest_edge", backend="isaac", usd_path=None)
-    with pytest.raises(ValueError, match="usd_path"):
+    with pytest.raises(RuntimeError, match="Isaac Sim Python modules are unavailable"):
         scene.load()
 
 
