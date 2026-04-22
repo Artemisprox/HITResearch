@@ -6,6 +6,7 @@ from pathlib import Path
 
 @dataclass(slots=True)
 class SensorConfig:
+    provider: str = "mock"
     stereo_width: int = 1280
     stereo_height: int = 720
     up_width: int = 1024
@@ -17,6 +18,10 @@ class SensorConfig:
 @dataclass(slots=True)
 class SceneConfig:
     map_name: str = "forest_edge"
+    backend: str = "mock"
+    usd_path: Path | None = None
+    drone_prim_path: str = "/World/Drone"
+    tree_count: int = 80
     area_radius_m: float = 200.0
     min_altitude_m: float = 20.0
     max_altitude_m: float = 80.0
@@ -33,6 +38,8 @@ class GeoConfig:
 class PolarizationConfig:
     lib_radtran_bin: str = "/opt/libRadtran/bin/uvspec"
     solar_wavelength_nm: int = 550
+    solar_zenith_deg: float = 40.0
+    solar_azimuth_deg: float = 140.0
     dolp_clip: float = 1.0
 
 
