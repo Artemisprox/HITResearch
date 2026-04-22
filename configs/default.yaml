@@ -6,6 +6,7 @@ run:
   scenario_id: forest_edge_baseline
 
 sensors:
+  provider: mock
   stereo_width: 1280
   stereo_height: 720
   up_width: 1024
@@ -15,6 +16,10 @@ sensors:
 
 scene:
   map_name: forest_edge
+  backend: mock
+  usd_path: null
+  drone_prim_path: /World/Drone
+  tree_count: 80
   area_radius_m: 100.0
   min_altitude_m: 25.0
   max_altitude_m: 60.0
@@ -27,4 +32,6 @@ geo:
 polarization:
   lib_radtran_bin: /opt/libRadtran/bin/uvspec
   solar_wavelength_nm: 550
+  solar_zenith_deg: 40.0
+  solar_azimuth_deg: 140.0
   dolp_clip: 1.0
