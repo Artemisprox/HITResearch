@@ -54,3 +54,30 @@ def test_to_bgr_rejects_zero_itemsize_dtype() -> None:
     arr = np.empty((2, 2, 4), dtype=np.dtype("V0"))
     with pytest.raises(RuntimeError, match="zero itemsize"):
         IsaacSensorBridge._to_bgr(arr)
+
+
+def test_read_bgr_with_retries_eventually_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+    bridge = IsaacSensorBridge(
+        stereo_left_prim="/World/Drone/stereo_left",
+        stereo_right_prim="/World/Drone/stereo_right",
+        upward_prim="/World/Drone/upward_cam",
+        imu_prim="/World/Drone/imu",
+        stereo_width=64,
+        stereo_height=48,
+        upward_width=64,
+        upward_height=64,
+    )
+
+    class _Ann:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get_data(self):
+            self.calls += 1
+            if self.calls < 3:
+                raise RuntimeError("temporary annotator failure")
+            return np.zeros((2, 2, 4), dtype=np.uint8)
+
+    monkeypatch.setattr(IsaacSensorBridge, "_update_app_once", staticmethod(lambda: None))
+    out = bridge._read_bgr_with_retries(_Ann(), "test", retries=4)
+    assert out.shape == (2, 2, 3)

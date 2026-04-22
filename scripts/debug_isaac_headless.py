@@ -27,8 +27,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _step(report: dict[str, Any], name: str, status: str, detail: str, **extra: Any) -> None:
+def _flush_report(report_path: Path, report: dict[str, Any]) -> None:
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _step(report: dict[str, Any], report_path: Path, name: str, status: str, detail: str, **extra: Any) -> None:
     report["steps"].append({"name": name, "status": status, "detail": detail, **extra})
+    _flush_report(report_path, report)
     print(f"[{status}] {name}: {detail}", flush=True)
 
 
@@ -44,7 +49,7 @@ def main() -> None:
         "steps": [],
         "ok": False,
     }
-    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    _flush_report(report_path, report)
 
     sim_app = None
     try:
@@ -53,14 +58,22 @@ def main() -> None:
         from hitresearch_sim.sensors.isaac_bridge import IsaacSensorBridge
 
         cfg = load_config(args.config)
-        _step(report, "load_config", "ok", "Config loaded", scene_backend=cfg.scene.backend, sensor_provider=cfg.sensors.provider)
+        _step(
+            report,
+            report_path,
+            "load_config",
+            "ok",
+            "Config loaded",
+            scene_backend=cfg.scene.backend,
+            sensor_provider=cfg.sensors.provider,
+        )
         if cfg.scene.backend != "isaac" or cfg.sensors.provider != "isaac":
             raise ValueError("Debug script requires scene.backend=isaac and sensors.provider=isaac")
 
         from isaacsim.simulation_app import SimulationApp
 
         sim_app = SimulationApp({"headless": True})
-        _step(report, "simulation_app", "ok", "SimulationApp started in headless mode")
+        _step(report, report_path, "simulation_app", "ok", "SimulationApp started in headless mode")
 
         scene = ForestScene(
             map_name=cfg.scene.map_name,
@@ -71,7 +84,7 @@ def main() -> None:
             drone_prim_path=cfg.scene.drone_prim_path,
         )
         scene_meta = scene.load()
-        _step(report, "scene_load", "ok", "Scene loaded", scene_meta=scene_meta)
+        _step(report, report_path, "scene_load", "ok", "Scene loaded", scene_meta=scene_meta)
 
         import omni.usd
 
@@ -88,7 +101,7 @@ def main() -> None:
         missing = [p for p in expected_prims if not stage.GetPrimAtPath(p).IsValid()]
         if missing:
             raise RuntimeError(f"Missing sensor prims: {missing}")
-        _step(report, "prim_check", "ok", "All expected sensor prims exist", prims=expected_prims)
+        _step(report, report_path, "prim_check", "ok", "All expected sensor prims exist", prims=expected_prims)
 
         bridge = IsaacSensorBridge(
             stereo_left_prim=f"{base}/stereo_left",
@@ -102,13 +115,14 @@ def main() -> None:
         )
 
         bridge.warmup()
-        _step(report, "bridge_warmup", "ok", "Isaac sensor bridge warmup succeeded")
+        _step(report, report_path, "bridge_warmup", "ok", "Isaac sensor bridge warmup succeeded")
 
         left, right = bridge.capture_stereo()
         upward = bridge.capture_upward()
         imu = bridge.sample_imu()
         _step(
             report,
+            report_path,
             "capture_once",
             "ok",
             "Captured stereo/upward/imu once",
@@ -124,14 +138,14 @@ def main() -> None:
         report["ok"] = True
     except Exception as exc:
         tb = traceback.format_exc()
-        _step(report, "exception", "error", str(exc), traceback=tb)
+        _step(report, report_path, "exception", "error", str(exc), traceback=tb)
         report["ok"] = False
     finally:
         if sim_app is not None:
             sim_app.close()
-            _step(report, "simulation_app_close", "ok", "SimulationApp closed")
+            _step(report, report_path, "simulation_app_close", "ok", "SimulationApp closed")
         report["finished_at"] = datetime.now(timezone.utc).isoformat()
-        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        _flush_report(report_path, report)
         print(f"Debug report written to: {report_path}", flush=True)
 
     if not report["ok"]:

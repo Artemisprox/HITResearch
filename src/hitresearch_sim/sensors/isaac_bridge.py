@@ -71,6 +71,24 @@ class IsaacSensorBridge:
         self._initialized = True
 
     @staticmethod
+    def _update_app_once() -> None:
+        try:
+            import omni.kit.app
+        except ImportError:
+            return
+        omni.kit.app.get_app().update()
+
+    def _read_bgr_with_retries(self, annotator: Any, name: str, retries: int = 12) -> np.ndarray:
+        last_exc: Exception | None = None
+        for _ in range(max(1, retries)):
+            try:
+                return self._to_bgr(annotator.get_data())
+            except Exception as exc:
+                last_exc = exc
+                self._update_app_once()
+        raise RuntimeError(f"Failed to read annotator '{name}' after {retries} retries: {last_exc}")
+
+    @staticmethod
     def _to_bgr(img: np.ndarray) -> np.ndarray:
         arr = IsaacSensorBridge._extract_array(img)
         if arr.dtype.itemsize == 0:
@@ -100,30 +118,23 @@ class IsaacSensorBridge:
         if self._warmed_up:
             return
         self._init_rgb_annotators()
-        try:
-            import omni.kit.app
-        except ImportError:
-            self._warmed_up = True
-            return
-
-        app = omni.kit.app.get_app()
         for _ in range(max(steps, 1)):
-            app.update()
+            self._update_app_once()
         # Validate one fetch to ensure render products are alive.
-        _ = self._to_bgr(self._left_ann.get_data())
-        _ = self._to_bgr(self._right_ann.get_data())
-        _ = self._to_bgr(self._up_ann.get_data())
+        _ = self._read_bgr_with_retries(self._left_ann, "stereo_left")
+        _ = self._read_bgr_with_retries(self._right_ann, "stereo_right")
+        _ = self._read_bgr_with_retries(self._up_ann, "upward")
         self._warmed_up = True
 
     def capture_stereo(self) -> tuple[np.ndarray, np.ndarray]:
         self.warmup()
-        left = self._to_bgr(self._left_ann.get_data())
-        right = self._to_bgr(self._right_ann.get_data())
+        left = self._read_bgr_with_retries(self._left_ann, "stereo_left")
+        right = self._read_bgr_with_retries(self._right_ann, "stereo_right")
         return left, right
 
     def capture_upward(self) -> np.ndarray:
         self.warmup()
-        return self._to_bgr(self._up_ann.get_data())
+        return self._read_bgr_with_retries(self._up_ann, "upward")
 
     def sample_imu(self) -> dict[str, float]:
         if self._imu_sensor is None:
