@@ -18,6 +18,7 @@
 
 - LUT resolution: `zenith=180`, `azimuth=360`.
 - Compositor assumes upward fisheye-like mapping (`r -> zenith`).
+- Sun geometry comes from config: `polarization.solar_zenith_deg` / `polarization.solar_azimuth_deg`.
 - This is a physics-inspired baseline for software integration; for publication-grade results, connect libRadtran and calibrate with sensor/FOV/intrinsics.
 
 ## References used for model direction

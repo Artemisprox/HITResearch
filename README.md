@@ -50,6 +50,8 @@ python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
 - 健康度、模式与控制占位字段
 - 图像与偏振数组文件的相对路径（`*_path`）
 
+并会额外输出 `sensor_meta.json`（相机内参与传感器元数据）。
+
 ## 目录
 - `src/hitresearch_sim/core`：运行编排、随机性管理、坐标系绑定
 - `src/hitresearch_sim/sensors`：双目/IMU/上视相机接口

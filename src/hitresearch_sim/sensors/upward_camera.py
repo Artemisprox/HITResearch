@@ -32,3 +32,15 @@ class UpwardCamera:
 
         self.frame_idx += 1
         return (img * 255).astype(np.uint8)
+
+    def intrinsics(self) -> dict[str, float | int | str]:
+        cx = (self.width - 1) * 0.5
+        cy = (self.height - 1) * 0.5
+        return {
+            "width": self.width,
+            "height": self.height,
+            "model": "fisheye_approx",
+            "cx": float(cx),
+            "cy": float(cy),
+            "fov_deg": 180.0,
+        }

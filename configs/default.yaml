@@ -32,4 +32,6 @@ geo:
 polarization:
   lib_radtran_bin: /opt/libRadtran/bin/uvspec
   solar_wavelength_nm: 550
+  solar_zenith_deg: 40.0
+  solar_azimuth_deg: 140.0
   dolp_clip: 1.0

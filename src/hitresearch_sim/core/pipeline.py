@@ -47,7 +47,6 @@ class SimulationPipeline:
         out_dir = self.config.run.output_root / self.config.run.scenario_id / f"run_{run_idx:03d}"
         if out_dir.exists():
             shutil.rmtree(out_dir)
-        writer = DatasetWriter(out_dir)
 
         scene_meta = self.scene.load()
         isaac_stage = None
@@ -76,8 +75,20 @@ class SimulationPipeline:
                 upward_width=self.config.sensors.up_width,
                 upward_height=self.config.sensors.up_height,
             )
+            sensor_meta = isaac_bridge.intrinsics()
+        else:
+            sensor_meta = {
+                "stereo": self.stereo.intrinsics(),
+                "upward": self.up_cam.intrinsics(),
+            }
+
+        writer = DatasetWriter(out_dir, sensor_meta=sensor_meta)
         points = self.traj.circular(self.config.run.duration_s, self.config.run.dt_s)
-        lut = self.lut_builder.build(solar_zenith_deg=40.0, solar_azimuth_deg=140.0, out_dir=out_dir)
+        lut = self.lut_builder.build(
+            solar_zenith_deg=self.config.polarization.solar_zenith_deg,
+            solar_azimuth_deg=self.config.polarization.solar_azimuth_deg,
+            out_dir=out_dir,
+        )
 
         for i, p in enumerate(points):
             if isaac_stage is not None and isaac_drone is not None:

@@ -38,6 +38,8 @@ class GeoConfig:
 class PolarizationConfig:
     lib_radtran_bin: str = "/opt/libRadtran/bin/uvspec"
     solar_wavelength_nm: int = 550
+    solar_zenith_deg: float = 40.0
+    solar_azimuth_deg: float = 140.0
     dolp_clip: float = 1.0
 
 

@@ -28,6 +28,7 @@ python scripts/inspect_isaac_setup.py --config configs/default.yaml --gui
 ## 3) 输出结构（CSV）
 每个 `run_xxx` 目录包含：
 - `dataset.csv`（统一索引与真值主表）
+- `sensor_meta.json`（相机内参与传感器元信息）
 - `frame_xxxxxx/stereo_left.png`
 - `frame_xxxxxx/stereo_right.png`
 - `frame_xxxxxx/upward_rgb.png`
@@ -36,6 +37,7 @@ python scripts/inspect_isaac_setup.py --config configs/default.yaml --gui
 - `frame_xxxxxx/aop.npy`
 
 > `dataset.csv` 每一行对应一个时间步，记录状态真值 + 传感器文件相对路径。
+> `sensor_meta.json` 用于标注双目/上视相机内参和模型，便于后处理与复现实验。
 
 ## 4) 快速可视化 demo
 ```bash

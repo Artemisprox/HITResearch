@@ -21,6 +21,8 @@ class IsaacSensorBridge:
     _left_ann: Any = None
     _right_ann: Any = None
     _up_ann: Any = None
+    _imu_sensor: Any = None
+    _imu_warned: bool = False
 
     def _init_rgb_annotators(self) -> None:
         if self._initialized:
@@ -63,7 +65,57 @@ class IsaacSensorBridge:
         return self._to_bgr(self._up_ann.get_data())
 
     def sample_imu(self) -> dict[str, float]:
-        # Placeholder: wire Isaac IMU API here when exact sensor plugin selection is fixed.
-        # Returning deterministic zero-like output keeps downstream schema stable.
-        _ = self.imu_prim
+        if self._imu_sensor is None:
+            try:
+                from omni.isaac.sensor import IMUSensor
+            except Exception:
+                self._imu_sensor = False
+            else:
+                try:
+                    self._imu_sensor = IMUSensor(prim_path=self.imu_prim, name="imu_bridge")
+                except Exception:
+                    self._imu_sensor = False
+
+        if self._imu_sensor not in (None, False):
+            try:
+                frame = self._imu_sensor.get_current_frame()
+                lin = frame.get("lin_acc", [0.0, 0.0, 9.81])
+                ang = frame.get("ang_vel", [0.0, 0.0, 0.0])
+                return {
+                    "ax": float(lin[0]),
+                    "ay": float(lin[1]),
+                    "az": float(lin[2]),
+                    "gx": float(ang[0]),
+                    "gy": float(ang[1]),
+                    "gz": float(ang[2]),
+                }
+            except Exception:
+                pass
+
+        if not self._imu_warned:
+            print("[warn] Isaac IMU API unavailable, using fallback IMU values.")
+            self._imu_warned = True
         return {"ax": 0.0, "ay": 0.0, "az": 9.81, "gx": 0.0, "gy": 0.0, "gz": 0.0}
+
+    def intrinsics(self) -> dict[str, dict[str, float | int | str]]:
+        fx = self.stereo_width * 0.9
+        fy = self.stereo_height * 0.9
+        return {
+            "stereo": {
+                "width": self.stereo_width,
+                "height": self.stereo_height,
+                "fx": float(fx),
+                "fy": float(fy),
+                "cx": float((self.stereo_width - 1) * 0.5),
+                "cy": float((self.stereo_height - 1) * 0.5),
+                "baseline_m": 0.16,
+            },
+            "upward": {
+                "width": self.upward_width,
+                "height": self.upward_height,
+                "model": "fisheye_approx",
+                "cx": float((self.upward_width - 1) * 0.5),
+                "cy": float((self.upward_height - 1) * 0.5),
+                "fov_deg": 180.0,
+            },
+        }

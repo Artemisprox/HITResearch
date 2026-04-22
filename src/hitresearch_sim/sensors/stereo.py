@@ -45,3 +45,18 @@ class StereoSensor:
         right[:, :6] = left[:, :6] // 2
         self.frame_idx += 1
         return left, right
+
+    def intrinsics(self) -> dict[str, float | int]:
+        fx = self.width * 0.9
+        fy = self.height * 0.9
+        cx = (self.width - 1) * 0.5
+        cy = (self.height - 1) * 0.5
+        return {
+            "width": self.width,
+            "height": self.height,
+            "fx": float(fx),
+            "fy": float(fy),
+            "cx": float(cx),
+            "cy": float(cy),
+            "baseline_m": 0.16,
+        }
