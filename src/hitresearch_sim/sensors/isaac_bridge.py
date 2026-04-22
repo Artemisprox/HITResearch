@@ -8,6 +8,8 @@ from typing import Any
 
 import numpy as np
 
+from hitresearch_sim.sensors.stereo import StereoSensor
+
 
 @dataclass(slots=True)
 class IsaacSensorBridge:
@@ -164,6 +166,13 @@ class IsaacSensorBridge:
             f"up={self._render_product_path(up_rp)}",
             force=True,
         )
+
+    def _enable_stereo_fallback(self, reason: str) -> None:
+        if self._stereo_fallback is None:
+            self._stereo_fallback = StereoSensor(self.stereo_width, self.stereo_height)
+        self._stereo_mode = "synthetic_fallback"
+        self._stereo_fallback_reason = reason
+        print(f"[warn] Stereo capture switched to synthetic fallback: {reason}")
 
     @staticmethod
     def _render_product_path(render_product: Any) -> str:
