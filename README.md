@@ -38,6 +38,7 @@ python scripts/demo_to_rviz_bag.py --config configs/default.yaml --run-idx 0
 ```bash
 python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
 ```
+若目标 bag 目录已存在，脚本默认自动切换为 `rviz_demo_bag_001`、`_002`…，避免直接报错；如需覆盖可加 `--overwrite`。
 
 ## 输出
 每个 run 输出一个 `dataset.csv`，包含：

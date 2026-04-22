@@ -52,6 +52,16 @@ def _to_time(t: float, time_type: Any) -> Any:
     return time_type(sec=sec, nanosec=nanosec)
 
 
+def _next_available_dir(base_dir: Path) -> Path:
+    if not base_dir.exists():
+        return base_dir
+    for idx in range(1, 1000):
+        candidate = base_dir.parent / f"{base_dir.name}_{idx:03d}"
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError(f"Unable to find available directory for {base_dir}")
+
+
 def export_dataset_to_bag(
     dataset_dir: Path,
     bag_dir: Path,
@@ -68,10 +78,9 @@ def export_dataset_to_bag(
 
     if bag_dir.exists():
         if not overwrite:
-            raise FileExistsError(
-                f"{bag_dir} already exists. Use --overwrite or choose a different --bag-dir."
-            )
-        shutil.rmtree(bag_dir)
+            bag_dir = _next_available_dir(bag_dir)
+        else:
+            shutil.rmtree(bag_dir)
     bag_dir.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_csv(dataset_dir / "dataset.csv").sort_values("frame_idx")
@@ -166,6 +175,8 @@ def main() -> None:
         bag_version=args.bag_version,
     )
     print(f"dataset source: {run_dir}")
+    if out != bag_dir:
+        print(f"requested bag directory existed, auto-switched to: {out}")
     print(f"rosbag2 written to: {out}")
     print("Use with ROS 2: ros2 bag play <bag_dir>, then open RViz to view /hitresearch/path and /hitresearch/pose")
 

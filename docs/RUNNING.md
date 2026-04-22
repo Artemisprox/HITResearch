@@ -50,6 +50,7 @@ ros2 bag play outputs/<scenario_id>/run_000/rviz_demo_bag
 ```bash
 python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
 ```
+如果 `rviz_demo_bag/` 已存在，默认会自动创建 `rviz_demo_bag_001` 等新目录；要覆盖原目录请加 `--overwrite`。
 
 ## 6) 接入 Isaac Sim / Pegasus
 当前 `ForestScene` 与各 `Sensor` 是 mock 接口：
