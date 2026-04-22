@@ -5,6 +5,8 @@ from typing import Any
 
 import numpy as np
 
+from hitresearch_sim.sensors.stereo import StereoSensor
+
 
 @dataclass(slots=True)
 class IsaacSensorBridge:
@@ -72,10 +74,22 @@ class IsaacSensorBridge:
 
         self._attach_records = []
         self._attach_failures = []
-        self._left_ann = self._attach_annotator(rep, left_rp, "stereo_left")
-        self._right_ann = self._attach_annotator(rep, right_rp, "stereo_right")
+        try:
+            self._left_ann = self._attach_annotator(rep, left_rp, "stereo_left")
+            self._right_ann = self._attach_annotator(rep, right_rp, "stereo_right")
+        except Exception as exc:
+            self._left_ann = None
+            self._right_ann = None
+            self._enable_stereo_fallback(f"replicator stereo attach failed: {exc}")
         self._up_ann = self._attach_annotator(rep, up_rp, "upward")
         self._initialized = True
+
+    def _enable_stereo_fallback(self, reason: str) -> None:
+        if self._stereo_fallback is None:
+            self._stereo_fallback = StereoSensor(self.stereo_width, self.stereo_height)
+        self._stereo_mode = "synthetic_fallback"
+        self._stereo_fallback_reason = reason
+        print(f"[warn] Stereo capture switched to synthetic fallback: {reason}")
 
     @staticmethod
     def _render_product_path(render_product: Any) -> str:
@@ -219,16 +233,23 @@ class IsaacSensorBridge:
         for _ in range(max(steps, 1)):
             self._update_app_once()
         # Validate one fetch to ensure render products are alive.
-        _ = self._read_bgr_with_retries(self._left_ann, "stereo_left")
-        _ = self._read_bgr_with_retries(self._right_ann, "stereo_right")
+        if self._left_ann is not None and self._right_ann is not None:
+            _ = self._read_bgr_with_retries(self._left_ann, "stereo_left")
+            _ = self._read_bgr_with_retries(self._right_ann, "stereo_right")
         _ = self._read_bgr_with_retries(self._up_ann, "upward")
         self._warmed_up = True
 
     def capture_stereo(self) -> tuple[np.ndarray, np.ndarray]:
         self.warmup()
-        left = self._read_bgr_with_retries(self._left_ann, "stereo_left")
-        right = self._read_bgr_with_retries(self._right_ann, "stereo_right")
-        return left, right
+        if self._stereo_fallback is not None:
+            return self._stereo_fallback.capture()
+        try:
+            left = self._read_bgr_with_retries(self._left_ann, "stereo_left")
+            right = self._read_bgr_with_retries(self._right_ann, "stereo_right")
+            return left, right
+        except Exception as exc:
+            self._enable_stereo_fallback(f"replicator stereo read failed: {exc}")
+            return self._stereo_fallback.capture()
 
     def capture_upward(self) -> np.ndarray:
         self.warmup()
