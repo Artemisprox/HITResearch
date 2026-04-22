@@ -8,6 +8,8 @@ from typing import Any
 
 import numpy as np
 
+from hitresearch_sim.sensors.stereo import StereoSensor
+
 
 @dataclass(slots=True)
 class IsaacSensorBridge:
