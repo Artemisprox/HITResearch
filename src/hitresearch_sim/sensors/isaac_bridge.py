@@ -34,6 +34,7 @@ class IsaacSensorBridge:
     _right_rp: Any = None
     _up_rp: Any = None
     _recent_errors: list[str] | None = None
+    _active_annotators: dict[str, str] | None = None
 
     @property
     def _debug_enabled(self) -> bool:
@@ -95,6 +96,7 @@ class IsaacSensorBridge:
         self._attach_records = []
         self._attach_failures = []
         self._recent_errors = []
+        self._active_annotators = {}
         self._left_ann = self._attach_annotator(rep, left_rp, "stereo_left")
         self._right_ann = self._attach_annotator(rep, right_rp, "stereo_right")
         self._up_ann = self._attach_annotator(rep, up_rp, "upward")
@@ -123,14 +125,33 @@ class IsaacSensorBridge:
             return path
         return str(render_product)
 
-    def _attach_annotator(self, rep: Any, render_product: Any, label: str) -> Any:
+    @staticmethod
+    def _annotator_preference_order(preferred: str | None = None) -> list[str]:
+        if preferred in ("rgb", "LdrColor"):
+            return [preferred, "LdrColor" if preferred == "rgb" else "rgb"]
+        raw = os.environ.get("HITRESEARCH_ISAAC_ANNOTATOR_ORDER", "rgb,LdrColor")
+        order: list[str] = []
+        for token in raw.split(","):
+            item = token.strip()
+            if item in ("rgb", "LdrColor") and item not in order:
+                order.append(item)
+        if not order:
+            order = ["rgb", "LdrColor"]
+        for fallback in ("rgb", "LdrColor"):
+            if fallback not in order:
+                order.append(fallback)
+        return order
+
+    def _attach_annotator(self, rep: Any, render_product: Any, label: str, preferred: str | None = None) -> Any:
         rp_path = self._render_product_path(render_product)
-        attempts: list[tuple[str, list[Any]]] = [
-            ("LdrColor", [render_product]),
-            ("LdrColor", [rp_path]),
-            ("rgb", [render_product]),
-            ("rgb", [rp_path]),
-        ]
+        attempts: list[tuple[str, list[Any]]] = []
+        for annotator_name in self._annotator_preference_order(preferred):
+            attempts.extend(
+                [
+                    (annotator_name, [render_product]),
+                    (annotator_name, [rp_path]),
+                ]
+            )
         errors: list[str] = []
         for annotator_name, target in attempts:
             try:
@@ -159,6 +180,8 @@ class IsaacSensorBridge:
                         "target": str(target[0]),
                     }
                 )
+            if self._active_annotators is not None:
+                self._active_annotators[label] = annotator_name
             self._log(
                 f"attach success sensor={label} annotator={annotator_name} target={type(target[0]).__name__}:{target[0]}"
             )
@@ -188,26 +211,26 @@ class IsaacSensorBridge:
         )
         return any(marker in text for marker in transient_markers)
 
-    def _reattach_annotator(self, name: str) -> None:
+    def _reattach_annotator(self, name: str, preferred: str | None = None) -> None:
         try:
             import omni.replicator.core as rep
         except ImportError:
             return
 
         if name == "stereo_left" and self._left_rp is not None:
-            self._left_ann = self._attach_annotator(rep, self._left_rp, "stereo_left")
+            self._left_ann = self._attach_annotator(rep, self._left_rp, "stereo_left", preferred=preferred)
             self._log(f"reattach completed for {name}", force=True)
             return
         if name == "stereo_right" and self._right_rp is not None:
-            self._right_ann = self._attach_annotator(rep, self._right_rp, "stereo_right")
+            self._right_ann = self._attach_annotator(rep, self._right_rp, "stereo_right", preferred=preferred)
             self._log(f"reattach completed for {name}", force=True)
             return
         if name == "upward" and self._up_rp is not None:
-            self._up_ann = self._attach_annotator(rep, self._up_rp, "upward")
+            self._up_ann = self._attach_annotator(rep, self._up_rp, "upward", preferred=preferred)
             self._log(f"reattach completed for {name}", force=True)
             return
 
-    def _recreate_render_product_and_annotator(self, name: str) -> None:
+    def _recreate_render_product_and_annotator(self, name: str, preferred: str | None = None) -> None:
         try:
             import omni.replicator.core as rep
         except ImportError:
@@ -216,15 +239,15 @@ class IsaacSensorBridge:
         if name == "stereo_left":
             rp = rep.create.render_product(self.stereo_left_prim, (self.stereo_width, self.stereo_height))
             self._left_rp = rp
-            self._left_ann = self._attach_annotator(rep, rp, "stereo_left")
+            self._left_ann = self._attach_annotator(rep, rp, "stereo_left", preferred=preferred)
         elif name == "stereo_right":
             rp = rep.create.render_product(self.stereo_right_prim, (self.stereo_width, self.stereo_height))
             self._right_rp = rp
-            self._right_ann = self._attach_annotator(rep, rp, "stereo_right")
+            self._right_ann = self._attach_annotator(rep, rp, "stereo_right", preferred=preferred)
         elif name == "upward":
             rp = rep.create.render_product(self.upward_prim, (self.upward_width, self.upward_height))
             self._up_rp = rp
-            self._up_ann = self._attach_annotator(rep, rp, "upward")
+            self._up_ann = self._attach_annotator(rep, rp, "upward", preferred=preferred)
         else:
             return
         self._log(f"recreated render product + annotator for {name}", force=True)
@@ -245,8 +268,13 @@ class IsaacSensorBridge:
                 self._log(err_msg)
                 if idx == half_idx and self._is_transient_frame_error(exc):
                     try:
-                        self._log(f"attempting annotator reattach for {name} after transient failures", force=True)
-                        self._reattach_annotator(name)
+                        current = (self._active_annotators or {}).get(name)
+                        preferred = "rgb" if current != "rgb" else "LdrColor"
+                        self._log(
+                            f"attempting annotator reattach for {name} after transient failures (preferred={preferred})",
+                            force=True,
+                        )
+                        self._reattach_annotator(name, preferred=preferred)
                     except Exception:
                         pass
                     next_ann = {
@@ -258,8 +286,13 @@ class IsaacSensorBridge:
                         annotator = next_ann
                 if idx == recreate_idx and self._is_transient_frame_error(exc):
                     try:
-                        self._log(f"attempting full render product recreation for {name}", force=True)
-                        self._recreate_render_product_and_annotator(name)
+                        current = (self._active_annotators or {}).get(name)
+                        preferred = "rgb" if current != "rgb" else "LdrColor"
+                        self._log(
+                            f"attempting full render product recreation for {name} (preferred={preferred})",
+                            force=True,
+                        )
+                        self._recreate_render_product_and_annotator(name, preferred=preferred)
                     except Exception as recreate_exc:
                         self._push_error(f"recreate failed for {name}: {recreate_exc}")
                     next_ann = {
@@ -397,4 +430,5 @@ class IsaacSensorBridge:
             "right_render_product": self._render_product_path(self._right_rp) if self._right_rp is not None else "",
             "up_render_product": self._render_product_path(self._up_rp) if self._up_rp is not None else "",
             "recent_errors": self._recent_errors or [],
+            "active_annotators": self._active_annotators or {},
         }

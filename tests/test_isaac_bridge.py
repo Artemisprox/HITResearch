@@ -130,7 +130,7 @@ def test_read_bgr_with_retries_can_recover_after_transient_empty_frame(monkeypat
             return np.zeros((2, 2, 4), dtype=np.uint8)
 
     monkeypatch.setattr(IsaacSensorBridge, "_update_app_once", staticmethod(lambda: None))
-    monkeypatch.setattr(IsaacSensorBridge, "_reattach_annotator", lambda self, _name: None)
+    monkeypatch.setattr(IsaacSensorBridge, "_reattach_annotator", lambda self, _name, preferred=None: None)
     out = bridge._read_bgr_with_retries(_Ann(), "stereo_left", retries=5)
     assert out.shape == (2, 2, 3)
 
@@ -156,12 +156,12 @@ def test_read_retries_attempts_recreate_pipeline(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(
         IsaacSensorBridge,
         "_reattach_annotator",
-        lambda self, _name: calls.__setitem__("reattach", calls["reattach"] + 1),
+        lambda self, _name, preferred=None: calls.__setitem__("reattach", calls["reattach"] + 1),
     )
     monkeypatch.setattr(
         IsaacSensorBridge,
         "_recreate_render_product_and_annotator",
-        lambda self, _name: calls.__setitem__("recreate", calls["recreate"] + 1),
+        lambda self, _name, preferred=None: calls.__setitem__("recreate", calls["recreate"] + 1),
     )
 
     with pytest.raises(RuntimeError, match="Failed to read annotator"):
@@ -169,3 +169,9 @@ def test_read_retries_attempts_recreate_pipeline(monkeypatch: pytest.MonkeyPatch
 
     assert calls["reattach"] == 1
     assert calls["recreate"] == 1
+
+
+def test_annotator_preference_order_defaults_to_rgb_first() -> None:
+    order = IsaacSensorBridge._annotator_preference_order()
+    assert order[0] == "rgb"
+    assert "LdrColor" in order
