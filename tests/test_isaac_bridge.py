@@ -175,3 +175,17 @@ def test_annotator_preference_order_defaults_to_rgb_first() -> None:
     order = IsaacSensorBridge._annotator_preference_order()
     assert order[0] == "rgb"
     assert "LdrColor" in order
+
+
+def test_orchestrator_step_disabled_by_default() -> None:
+    bridge = IsaacSensorBridge(
+        stereo_left_prim="/World/Drone/stereo_left",
+        stereo_right_prim="/World/Drone/stereo_right",
+        upward_prim="/World/Drone/upward_cam",
+        imu_prim="/World/Drone/imu",
+        stereo_width=32,
+        stereo_height=24,
+        upward_width=64,
+        upward_height=64,
+    )
+    assert bridge._enable_orchestrator_step is False

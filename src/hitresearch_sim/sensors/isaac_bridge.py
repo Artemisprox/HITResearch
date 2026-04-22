@@ -53,7 +53,7 @@ class IsaacSensorBridge:
 
     @property
     def _enable_orchestrator_step(self) -> bool:
-        raw = os.environ.get("HITRESEARCH_ISAAC_ORCHESTRATOR_STEP", "1")
+        raw = os.environ.get("HITRESEARCH_ISAAC_ORCHESTRATOR_STEP", "0")
         return raw not in ("", "0", "false", "False")
 
     def _log(self, msg: str, *, force: bool = False) -> None:
@@ -217,7 +217,7 @@ class IsaacSensorBridge:
 
     def _step_render_pipeline_once(self) -> None:
         self._update_app_once()
-        if not self._enable_orchestrator_step:
+        if not self._enable_orchestrator_step or self._orchestrator_warned:
             return
         try:
             import omni.replicator.core as rep
