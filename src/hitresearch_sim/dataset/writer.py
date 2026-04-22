@@ -1,20 +1,26 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 from typing import Any
 
-import cv2
 import numpy as np
 
 
 class DatasetWriter:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, sensor_meta: dict[str, Any] | None = None) -> None:
         self.root = root
         self.root.mkdir(parents=True, exist_ok=True)
         self.rows: list[dict[str, Any]] = []
+        if sensor_meta is not None:
+            meta_path = self.root / "sensor_meta.json"
+            with meta_path.open("w", encoding="utf-8") as f:
+                json.dump(sensor_meta, f, ensure_ascii=False, indent=2)
 
     def write_frame(self, idx: int, payload: dict[str, Any]) -> None:
+        import cv2
+
         frame_dir = self.root / f"frame_{idx:06d}"
         frame_dir.mkdir(parents=True, exist_ok=True)
 
