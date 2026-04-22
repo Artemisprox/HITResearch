@@ -76,6 +76,11 @@ class IsaacSensorBridge:
             value = 30
         return max(1, value)
 
+    @property
+    def _camera_initialize_enabled(self) -> bool:
+        raw = os.environ.get("HITRESEARCH_ISAAC_CAMERA_INIT", "0")
+        return raw not in ("", "0", "false", "False")
+
     def _log(self, msg: str, *, force: bool = False) -> None:
         if not (force or self._debug_enabled):
             return
@@ -126,21 +131,29 @@ class IsaacSensorBridge:
                 "Isaac stereo bridge now requires omni.isaac.sensor.Camera for stereo capture."
             ) from exc
 
-        self._left_cam = Camera(
-            prim_path=self.stereo_left_prim,
-            name="stereo_left_bridge_cam",
-            resolution=(self.stereo_width, self.stereo_height),
-        )
-        self._right_cam = Camera(
-            prim_path=self.stereo_right_prim,
-            name="stereo_right_bridge_cam",
-            resolution=(self.stereo_width, self.stereo_height),
-        )
+        def _build_camera(prim_path: str, name: str) -> Any:
+            try:
+                cam = Camera(prim_path=prim_path, name=name)
+            except TypeError:
+                cam = Camera(prim_path=prim_path, name=name, resolution=(self.stereo_width, self.stereo_height))
+            set_res = getattr(cam, "set_resolution", None)
+            if callable(set_res):
+                try:
+                    set_res((self.stereo_width, self.stereo_height))
+                except Exception:
+                    pass
+            return cam
+
+        self._left_cam = _build_camera(self.stereo_left_prim, "stereo_left_bridge_cam")
+        self._right_cam = _build_camera(self.stereo_right_prim, "stereo_right_bridge_cam")
         for cam in (self._left_cam, self._right_cam):
             init_fn = getattr(cam, "initialize", None)
-            if callable(init_fn):
+            if callable(init_fn) and self._camera_initialize_enabled:
                 init_fn()
-        self._log("initialized stereo capture via omni.isaac.sensor.Camera", force=True)
+        self._log(
+            f"initialized stereo capture via omni.isaac.sensor.Camera (initialize={self._camera_initialize_enabled})",
+            force=True,
+        )
 
     def _init_upward_annotator(self) -> None:
         try:
@@ -166,13 +179,6 @@ class IsaacSensorBridge:
             f"up={self._render_product_path(up_rp)}",
             force=True,
         )
-
-    def _enable_stereo_fallback(self, reason: str) -> None:
-        if self._stereo_fallback is None:
-            self._stereo_fallback = StereoSensor(self.stereo_width, self.stereo_height)
-        self._stereo_mode = "synthetic_fallback"
-        self._stereo_fallback_reason = reason
-        print(f"[warn] Stereo capture switched to synthetic fallback: {reason}")
 
     @staticmethod
     def _render_product_path(render_product: Any) -> str:

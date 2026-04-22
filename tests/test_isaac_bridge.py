@@ -191,6 +191,7 @@ def test_orchestrator_step_disabled_by_default() -> None:
     assert bridge._enable_orchestrator_step is False
     assert bridge._default_read_retries == 60
     assert bridge._default_warmup_steps == 30
+    assert bridge._camera_initialize_enabled is False
 
 
 def test_read_stereo_camera_bgr_from_current_frame(monkeypatch: pytest.MonkeyPatch) -> None:
