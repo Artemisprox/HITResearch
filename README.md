@@ -15,6 +15,7 @@ source .venv/bin/activate
 pip install -e .
 python scripts/run_batch.py --config configs/default.yaml --num-runs 2 --seed 42
 ```
+`run_batch.py` 现在会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致“看起来还是旧的黑图”。
 
 ## 快速可视化 demo
 ```bash

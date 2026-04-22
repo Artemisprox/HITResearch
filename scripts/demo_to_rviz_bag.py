@@ -4,10 +4,16 @@ from __future__ import annotations
 import argparse
 import math
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(

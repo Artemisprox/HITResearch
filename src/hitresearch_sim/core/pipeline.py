@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
+import shutil
 
 from hitresearch_sim.config.schema import AppConfig
 from hitresearch_sim.dataset.writer import DatasetWriter
@@ -37,6 +38,8 @@ class SimulationPipeline:
 
     def run(self, run_idx: int) -> Path:
         out_dir = self.config.run.output_root / self.config.run.scenario_id / f"run_{run_idx:03d}"
+        if out_dir.exists():
+            shutil.rmtree(out_dir)
         writer = DatasetWriter(out_dir)
 
         self.scene.load()

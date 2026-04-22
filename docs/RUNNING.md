@@ -9,6 +9,7 @@ pip install -e .
 ```bash
 python scripts/run_batch.py --config configs/default.yaml --num-runs 5 --seed 123
 ```
+每次执行会先清理目标 `run_xxx/` 输出目录，再写入新一轮帧数据，避免读取到历史残留帧。
 
 ## 3) 输出结构（CSV）
 每个 `run_xxx` 目录包含：
