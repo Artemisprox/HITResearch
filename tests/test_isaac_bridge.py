@@ -97,3 +97,4 @@ def test_bridge_diagnostics_contains_prim_paths() -> None:
     diag = bridge.diagnostics()
     assert diag["stereo_left_prim"] == "/World/Drone/stereo_left"
     assert isinstance(diag["attach_records"], list)
+    assert isinstance(diag["attach_failures"], list)

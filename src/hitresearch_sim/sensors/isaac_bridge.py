@@ -25,6 +25,7 @@ class IsaacSensorBridge:
     _imu_warned: bool = False
     _warmed_up: bool = False
     _attach_records: list[dict[str, str]] | None = None
+    _attach_failures: list[dict[str, str]] | None = None
 
     @staticmethod
     def _extract_array(data: Any) -> np.ndarray:
@@ -64,6 +65,7 @@ class IsaacSensorBridge:
         up_rp = rep.create.render_product(self.upward_prim, (self.upward_width, self.upward_height))
 
         self._attach_records = []
+        self._attach_failures = []
         self._left_ann = self._attach_annotator(rep, left_rp, "stereo_left")
         self._right_ann = self._attach_annotator(rep, right_rp, "stereo_right")
         self._up_ann = self._attach_annotator(rep, up_rp, "upward")
@@ -81,10 +83,10 @@ class IsaacSensorBridge:
     def _attach_annotator(self, rep: Any, render_product: Any, label: str) -> Any:
         rp_path = self._render_product_path(render_product)
         attempts: list[tuple[str, list[Any]]] = [
-            ("rgb", [render_product]),
-            ("rgb", [rp_path]),
             ("LdrColor", [render_product]),
             ("LdrColor", [rp_path]),
+            ("rgb", [render_product]),
+            ("rgb", [rp_path]),
         ]
         errors: list[str] = []
         for annotator_name, target in attempts:
@@ -93,6 +95,16 @@ class IsaacSensorBridge:
                 ann.attach(target)
             except Exception as exc:
                 errors.append(f"{annotator_name}@{type(target[0]).__name__}:{exc}")
+                if self._attach_failures is not None:
+                    self._attach_failures.append(
+                        {
+                            "sensor": label,
+                            "annotator": annotator_name,
+                            "target_type": type(target[0]).__name__,
+                            "target": str(target[0]),
+                            "error": str(exc),
+                        }
+                    )
                 continue
 
             if self._attach_records is not None:
@@ -112,6 +124,17 @@ class IsaacSensorBridge:
 
     @staticmethod
     def _update_app_once() -> None:
+        try:
+            import omni.replicator.core as rep
+        except ImportError:
+            pass
+        else:
+            try:
+                rep.orchestrator.step()
+                return
+            except Exception:
+                pass
+
         try:
             import omni.kit.app
         except ImportError:
@@ -239,4 +262,5 @@ class IsaacSensorBridge:
             "upward_prim": self.upward_prim,
             "imu_prim": self.imu_prim,
             "attach_records": self._attach_records or [],
+            "attach_failures": self._attach_failures or [],
         }
