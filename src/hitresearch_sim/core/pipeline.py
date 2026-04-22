@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
+import shutil
 
 from hitresearch_sim.config.schema import AppConfig
 from hitresearch_sim.dataset.writer import DatasetWriter
@@ -19,7 +20,11 @@ from hitresearch_sim.sensors.upward_camera import UpwardCamera
 class SimulationPipeline:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-        self.scene = ForestScene(config.scene.map_name)
+        self.scene = ForestScene(
+            config.scene.map_name,
+            backend=config.scene.backend,
+            usd_path=config.scene.usd_path,
+        )
         self.traj = TrajectoryGenerator(
             radius_m=config.scene.area_radius_m,
             min_alt_m=config.scene.min_altitude_m,
@@ -37,6 +42,8 @@ class SimulationPipeline:
 
     def run(self, run_idx: int) -> Path:
         out_dir = self.config.run.output_root / self.config.run.scenario_id / f"run_{run_idx:03d}"
+        if out_dir.exists():
+            shutil.rmtree(out_dir)
         writer = DatasetWriter(out_dir)
 
         self.scene.load()
