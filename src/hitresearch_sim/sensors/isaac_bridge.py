@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
@@ -26,6 +28,27 @@ class IsaacSensorBridge:
     _warmed_up: bool = False
     _attach_records: list[dict[str, str]] | None = None
     _attach_failures: list[dict[str, str]] | None = None
+    _left_rp: Any = None
+    _right_rp: Any = None
+    _up_rp: Any = None
+    _recent_errors: list[str] | None = None
+
+    @property
+    def _debug_enabled(self) -> bool:
+        return os.environ.get("HITRESEARCH_ISAAC_DEBUG", "0") not in ("", "0", "false", "False")
+
+    def _log(self, msg: str, *, force: bool = False) -> None:
+        if not (force or self._debug_enabled):
+            return
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        print(f"[isaac_bridge][{ts}] {msg}")
+
+    def _push_error(self, msg: str) -> None:
+        if self._recent_errors is None:
+            self._recent_errors = []
+        self._recent_errors.append(msg)
+        if len(self._recent_errors) > 100:
+            self._recent_errors = self._recent_errors[-100:]
 
     @staticmethod
     def _extract_array(data: Any) -> np.ndarray:
@@ -63,12 +86,23 @@ class IsaacSensorBridge:
         left_rp = rep.create.render_product(self.stereo_left_prim, (self.stereo_width, self.stereo_height))
         right_rp = rep.create.render_product(self.stereo_right_prim, (self.stereo_width, self.stereo_height))
         up_rp = rep.create.render_product(self.upward_prim, (self.upward_width, self.upward_height))
+        self._left_rp = left_rp
+        self._right_rp = right_rp
+        self._up_rp = up_rp
 
         self._attach_records = []
         self._attach_failures = []
+        self._recent_errors = []
         self._left_ann = self._attach_annotator(rep, left_rp, "stereo_left")
         self._right_ann = self._attach_annotator(rep, right_rp, "stereo_right")
         self._up_ann = self._attach_annotator(rep, up_rp, "upward")
+        self._log(
+            "render products created: "
+            f"left={self._render_product_path(left_rp)}, "
+            f"right={self._render_product_path(right_rp)}, "
+            f"up={self._render_product_path(up_rp)}",
+            force=True,
+        )
         self._initialized = True
 
     @staticmethod
@@ -116,6 +150,9 @@ class IsaacSensorBridge:
                         "target": str(target[0]),
                     }
                 )
+            self._log(
+                f"attach success sensor={label} annotator={annotator_name} target={type(target[0]).__name__}:{target[0]}"
+            )
             return ann
 
         raise RuntimeError(
@@ -125,29 +162,104 @@ class IsaacSensorBridge:
     @staticmethod
     def _update_app_once() -> None:
         try:
-            import omni.replicator.core as rep
-        except ImportError:
-            pass
-        else:
-            try:
-                rep.orchestrator.step()
-                return
-            except Exception:
-                pass
-
-        try:
             import omni.kit.app
         except ImportError:
             return
         omni.kit.app.get_app().update()
 
-    def _read_bgr_with_retries(self, annotator: Any, name: str, retries: int = 12) -> np.ndarray:
+    @staticmethod
+    def _is_transient_frame_error(exc: Exception) -> bool:
+        text = str(exc).lower()
+        transient_markers = (
+            "empty frame",
+            "empty image",
+            "unexpected annotator image shape: (0,)",
+            "insufficient channels",
+            "no image data",
+        )
+        return any(marker in text for marker in transient_markers)
+
+    def _reattach_annotator(self, name: str) -> None:
+        try:
+            import omni.replicator.core as rep
+        except ImportError:
+            return
+
+        if name == "stereo_left" and self._left_rp is not None:
+            self._left_ann = self._attach_annotator(rep, self._left_rp, "stereo_left")
+            self._log(f"reattach completed for {name}", force=True)
+            return
+        if name == "stereo_right" and self._right_rp is not None:
+            self._right_ann = self._attach_annotator(rep, self._right_rp, "stereo_right")
+            self._log(f"reattach completed for {name}", force=True)
+            return
+        if name == "upward" and self._up_rp is not None:
+            self._up_ann = self._attach_annotator(rep, self._up_rp, "upward")
+            self._log(f"reattach completed for {name}", force=True)
+            return
+
+    def _recreate_render_product_and_annotator(self, name: str) -> None:
+        try:
+            import omni.replicator.core as rep
+        except ImportError:
+            return
+
+        if name == "stereo_left":
+            rp = rep.create.render_product(self.stereo_left_prim, (self.stereo_width, self.stereo_height))
+            self._left_rp = rp
+            self._left_ann = self._attach_annotator(rep, rp, "stereo_left")
+        elif name == "stereo_right":
+            rp = rep.create.render_product(self.stereo_right_prim, (self.stereo_width, self.stereo_height))
+            self._right_rp = rp
+            self._right_ann = self._attach_annotator(rep, rp, "stereo_right")
+        elif name == "upward":
+            rp = rep.create.render_product(self.upward_prim, (self.upward_width, self.upward_height))
+            self._up_rp = rp
+            self._up_ann = self._attach_annotator(rep, rp, "upward")
+        else:
+            return
+        self._log(f"recreated render product + annotator for {name}", force=True)
+        self._update_app_once()
+        self._update_app_once()
+
+    def _read_bgr_with_retries(self, annotator: Any, name: str, retries: int = 20) -> np.ndarray:
         last_exc: Exception | None = None
-        for _ in range(max(1, retries)):
+        half_idx = max(1, retries) // 2
+        recreate_idx = max(1, (max(1, retries) * 2) // 3)
+        for idx in range(max(1, retries)):
             try:
                 return self._to_bgr(annotator.get_data())
             except Exception as exc:
                 last_exc = exc
+                err_msg = f"{name} retry[{idx + 1}/{max(1, retries)}] {type(exc).__name__}: {exc}"
+                self._push_error(err_msg)
+                self._log(err_msg)
+                if idx == half_idx and self._is_transient_frame_error(exc):
+                    try:
+                        self._log(f"attempting annotator reattach for {name} after transient failures", force=True)
+                        self._reattach_annotator(name)
+                    except Exception:
+                        pass
+                    next_ann = {
+                        "stereo_left": self._left_ann,
+                        "stereo_right": self._right_ann,
+                        "upward": self._up_ann,
+                    }.get(name, None)
+                    if next_ann is not None:
+                        annotator = next_ann
+                if idx == recreate_idx and self._is_transient_frame_error(exc):
+                    try:
+                        self._log(f"attempting full render product recreation for {name}", force=True)
+                        self._recreate_render_product_and_annotator(name)
+                    except Exception as recreate_exc:
+                        self._push_error(f"recreate failed for {name}: {recreate_exc}")
+                    next_ann = {
+                        "stereo_left": self._left_ann,
+                        "stereo_right": self._right_ann,
+                        "upward": self._up_ann,
+                    }.get(name, None)
+                    if next_ann is not None:
+                        annotator = next_ann
                 self._update_app_once()
         raise RuntimeError(f"Failed to read annotator '{name}' after {retries} retries: {last_exc}")
 
@@ -160,6 +272,8 @@ class IsaacSensorBridge:
             )
 
         if arr.ndim != 3:
+            if arr.size == 0:
+                raise RuntimeError(f"Annotator returned empty frame: shape={arr.shape}, dtype={arr.dtype}")
             raise ValueError(f"Unexpected annotator image shape: {arr.shape}, dtype={arr.dtype}")
 
         if arr.shape[-1] < 3:
@@ -263,4 +377,8 @@ class IsaacSensorBridge:
             "imu_prim": self.imu_prim,
             "attach_records": self._attach_records or [],
             "attach_failures": self._attach_failures or [],
+            "left_render_product": self._render_product_path(self._left_rp) if self._left_rp is not None else "",
+            "right_render_product": self._render_product_path(self._right_rp) if self._right_rp is not None else "",
+            "up_render_product": self._render_product_path(self._up_rp) if self._up_rp is not None else "",
+            "recent_errors": self._recent_errors or [],
         }
