@@ -24,6 +24,22 @@ python scripts/visualize_dataset.py \
   --save outputs/forest_edge_baseline/run_000/preview.png
 ```
 
+## 导出 RViz 可演示的 rosbag2 demo
+```bash
+pip install -e '.[ros]'
+python scripts/demo_to_rviz_bag.py --config configs/default.yaml --run-idx 0
+```
+该脚本会：
+- 先跑一次 mock 仿真并生成 `dataset.csv`
+- 再导出 `rviz_demo_bag/`（话题：`/hitresearch/path`、`/hitresearch/pose`、`/imu/data`）
+- 可在 ROS 2 中 `ros2 bag play <bag_dir>`，然后用 RViz 订阅上述话题演示飞行轨迹
+
+如遇 `Writer.__init__() missing ... 'version'` 或版本兼容问题，可显式指定：
+```bash
+python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
+```
+若目标 bag 目录已存在，脚本默认自动切换为 `rviz_demo_bag_001`、`_002`…，避免直接报错；如需覆盖可加 `--overwrite`。
+
 ## 输出
 每个 run 输出一个 `dataset.csv`，包含：
 - 轨迹/姿态真值（`t/x/y/z/yaw_deg`）
