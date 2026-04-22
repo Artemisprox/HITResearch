@@ -17,6 +17,10 @@ class SensorConfig:
 @dataclass(slots=True)
 class SceneConfig:
     map_name: str = "forest_edge"
+    backend: str = "mock"
+    usd_path: Path | None = None
+    drone_prim_path: str = "/World/Drone"
+    tree_count: int = 80
     area_radius_m: float = 200.0
     min_altitude_m: float = 20.0
     max_altitude_m: float = 80.0

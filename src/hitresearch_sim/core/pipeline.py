@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
+import shutil
 
 from hitresearch_sim.config.schema import AppConfig
 from hitresearch_sim.dataset.writer import DatasetWriter
@@ -19,7 +20,14 @@ from hitresearch_sim.sensors.upward_camera import UpwardCamera
 class SimulationPipeline:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-        self.scene = ForestScene(config.scene.map_name)
+        self.scene = ForestScene(
+            config.scene.map_name,
+            backend=config.scene.backend,
+            usd_path=config.scene.usd_path,
+            area_radius_m=config.scene.area_radius_m,
+            tree_count=config.scene.tree_count,
+            drone_prim_path=config.scene.drone_prim_path,
+        )
         self.traj = TrajectoryGenerator(
             radius_m=config.scene.area_radius_m,
             min_alt_m=config.scene.min_altitude_m,
@@ -37,13 +45,28 @@ class SimulationPipeline:
 
     def run(self, run_idx: int) -> Path:
         out_dir = self.config.run.output_root / self.config.run.scenario_id / f"run_{run_idx:03d}"
+        if out_dir.exists():
+            shutil.rmtree(out_dir)
         writer = DatasetWriter(out_dir)
 
-        self.scene.load()
+        scene_meta = self.scene.load()
+        isaac_stage = None
+        isaac_drone = None
+        if scene_meta.get("backend") == "isaac":
+            try:
+                import omni.usd
+                from hitresearch_sim.platforms.isaac_drone import IsaacDroneRig
+            except ImportError:
+                isaac_stage = None
+            else:
+                isaac_stage = omni.usd.get_context().get_stage()
+                isaac_drone = IsaacDroneRig(prim_path=self.config.scene.drone_prim_path)
         points = self.traj.circular(self.config.run.duration_s, self.config.run.dt_s)
         lut = self.lut_builder.build(solar_zenith_deg=40.0, solar_azimuth_deg=140.0, out_dir=out_dir)
 
         for i, p in enumerate(points):
+            if isaac_stage is not None and isaac_drone is not None:
+                isaac_drone.set_pose(isaac_stage, p.x, p.y, p.z, p.yaw_deg)
             left, right = self.stereo.capture()
             upward = self.up_cam.capture()
             imu = self.imu.sample()
