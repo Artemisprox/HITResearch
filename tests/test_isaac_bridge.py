@@ -98,3 +98,47 @@ def test_bridge_diagnostics_contains_prim_paths() -> None:
     assert diag["stereo_left_prim"] == "/World/Drone/stereo_left"
     assert isinstance(diag["attach_records"], list)
     assert isinstance(diag["attach_failures"], list)
+
+
+def test_capture_stereo_uses_fallback_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    bridge = IsaacSensorBridge(
+        stereo_left_prim="/World/Drone/stereo_left",
+        stereo_right_prim="/World/Drone/stereo_right",
+        upward_prim="/World/Drone/upward_cam",
+        imu_prim="/World/Drone/imu",
+        stereo_width=32,
+        stereo_height=24,
+        upward_width=64,
+        upward_height=64,
+    )
+    bridge._enable_stereo_fallback("test fallback")
+    monkeypatch.setattr(IsaacSensorBridge, "warmup", lambda self: None)
+    left, right = bridge.capture_stereo()
+    assert left.shape == (24, 32, 3)
+    assert right.shape == (24, 32, 3)
+
+
+def test_capture_stereo_switches_to_fallback_on_read_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    bridge = IsaacSensorBridge(
+        stereo_left_prim="/World/Drone/stereo_left",
+        stereo_right_prim="/World/Drone/stereo_right",
+        upward_prim="/World/Drone/upward_cam",
+        imu_prim="/World/Drone/imu",
+        stereo_width=32,
+        stereo_height=24,
+        upward_width=64,
+        upward_height=64,
+    )
+    bridge._left_ann = object()
+    bridge._right_ann = object()
+    monkeypatch.setattr(IsaacSensorBridge, "warmup", lambda self: None)
+
+    def _raise(*_args, **_kwargs):
+        raise RuntimeError("replicator read failed")
+
+    monkeypatch.setattr(IsaacSensorBridge, "_read_bgr_with_retries", lambda self, *_args, **_kwargs: _raise())
+    left, right = bridge.capture_stereo()
+    assert bridge._stereo_mode == "synthetic_fallback"
+    assert "replicator stereo read failed" in bridge._stereo_fallback_reason
+    assert left.shape == (24, 32, 3)
+    assert right.shape == (24, 32, 3)
