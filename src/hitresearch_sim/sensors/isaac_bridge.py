@@ -26,6 +26,9 @@ class IsaacSensorBridge:
     _warmed_up: bool = False
     _attach_records: list[dict[str, str]] | None = None
     _attach_failures: list[dict[str, str]] | None = None
+    _left_rp: Any = None
+    _right_rp: Any = None
+    _up_rp: Any = None
 
     @staticmethod
     def _extract_array(data: Any) -> np.ndarray:
@@ -63,6 +66,9 @@ class IsaacSensorBridge:
         left_rp = rep.create.render_product(self.stereo_left_prim, (self.stereo_width, self.stereo_height))
         right_rp = rep.create.render_product(self.stereo_right_prim, (self.stereo_width, self.stereo_height))
         up_rp = rep.create.render_product(self.upward_prim, (self.upward_width, self.upward_height))
+        self._left_rp = left_rp
+        self._right_rp = right_rp
+        self._up_rp = up_rp
 
         self._attach_records = []
         self._attach_failures = []
@@ -125,29 +131,56 @@ class IsaacSensorBridge:
     @staticmethod
     def _update_app_once() -> None:
         try:
-            import omni.replicator.core as rep
-        except ImportError:
-            pass
-        else:
-            try:
-                rep.orchestrator.step()
-                return
-            except Exception:
-                pass
-
-        try:
             import omni.kit.app
         except ImportError:
             return
         omni.kit.app.get_app().update()
 
-    def _read_bgr_with_retries(self, annotator: Any, name: str, retries: int = 12) -> np.ndarray:
+    @staticmethod
+    def _is_transient_frame_error(exc: Exception) -> bool:
+        text = str(exc).lower()
+        transient_markers = (
+            "empty frame",
+            "empty image",
+            "unexpected annotator image shape: (0,)",
+            "insufficient channels",
+            "no image data",
+        )
+        return any(marker in text for marker in transient_markers)
+
+    def _reattach_annotator(self, name: str) -> None:
+        try:
+            import omni.replicator.core as rep
+        except ImportError:
+            return
+
+        if name == "stereo_left" and self._left_rp is not None:
+            self._left_ann = self._attach_annotator(rep, self._left_rp, "stereo_left")
+            return
+        if name == "stereo_right" and self._right_rp is not None:
+            self._right_ann = self._attach_annotator(rep, self._right_rp, "stereo_right")
+            return
+        if name == "upward" and self._up_rp is not None:
+            self._up_ann = self._attach_annotator(rep, self._up_rp, "upward")
+            return
+
+    def _read_bgr_with_retries(self, annotator: Any, name: str, retries: int = 20) -> np.ndarray:
         last_exc: Exception | None = None
-        for _ in range(max(1, retries)):
+        for idx in range(max(1, retries)):
             try:
                 return self._to_bgr(annotator.get_data())
             except Exception as exc:
                 last_exc = exc
+                if idx == max(1, retries) // 2 and self._is_transient_frame_error(exc):
+                    try:
+                        self._reattach_annotator(name)
+                    except Exception:
+                        pass
+                    annotator = {
+                        "stereo_left": self._left_ann,
+                        "stereo_right": self._right_ann,
+                        "upward": self._up_ann,
+                    }.get(name, annotator)
                 self._update_app_once()
         raise RuntimeError(f"Failed to read annotator '{name}' after {retries} retries: {last_exc}")
 
@@ -160,6 +193,8 @@ class IsaacSensorBridge:
             )
 
         if arr.ndim != 3:
+            if arr.size == 0:
+                raise RuntimeError(f"Annotator returned empty frame: shape={arr.shape}, dtype={arr.dtype}")
             raise ValueError(f"Unexpected annotator image shape: {arr.shape}, dtype={arr.dtype}")
 
         if arr.shape[-1] < 3:
@@ -263,4 +298,7 @@ class IsaacSensorBridge:
             "imu_prim": self.imu_prim,
             "attach_records": self._attach_records or [],
             "attach_failures": self._attach_failures or [],
+            "left_render_product": self._render_product_path(self._left_rp) if self._left_rp is not None else "",
+            "right_render_product": self._render_product_path(self._right_rp) if self._right_rp is not None else "",
+            "up_render_product": self._render_product_path(self._up_rp) if self._up_rp is not None else "",
         }

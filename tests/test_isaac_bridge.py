@@ -98,3 +98,37 @@ def test_bridge_diagnostics_contains_prim_paths() -> None:
     assert diag["stereo_left_prim"] == "/World/Drone/stereo_left"
     assert isinstance(diag["attach_records"], list)
     assert isinstance(diag["attach_failures"], list)
+    assert "left_render_product" in diag
+
+
+def test_to_bgr_rejects_empty_frame_shape() -> None:
+    with pytest.raises(RuntimeError, match="empty frame"):
+        IsaacSensorBridge._to_bgr(np.array([], dtype=np.float64))
+
+
+def test_read_bgr_with_retries_can_recover_after_transient_empty_frame(monkeypatch: pytest.MonkeyPatch) -> None:
+    bridge = IsaacSensorBridge(
+        stereo_left_prim="/World/Drone/stereo_left",
+        stereo_right_prim="/World/Drone/stereo_right",
+        upward_prim="/World/Drone/upward_cam",
+        imu_prim="/World/Drone/imu",
+        stereo_width=32,
+        stereo_height=24,
+        upward_width=64,
+        upward_height=64,
+    )
+
+    class _Ann:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get_data(self):
+            self.calls += 1
+            if self.calls < 3:
+                return np.array([], dtype=np.float64)
+            return np.zeros((2, 2, 4), dtype=np.uint8)
+
+    monkeypatch.setattr(IsaacSensorBridge, "_update_app_once", staticmethod(lambda: None))
+    monkeypatch.setattr(IsaacSensorBridge, "_reattach_annotator", lambda self, _name: None)
+    out = bridge._read_bgr_with_retries(_Ann(), "stereo_left", retries=5)
+    assert out.shape == (2, 2, 3)
