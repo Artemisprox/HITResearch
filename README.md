@@ -33,6 +33,8 @@
 
 `run_batch.py` 会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致误判。
 
+`run_batch.py` 会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致误判。
+
 > 默认配置为 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
 > 若当前不在 Isaac Python 环境中，会直接报错退出（严格 Isaac-only）。
 
@@ -98,6 +100,22 @@
 ```
 
 若 Isaac 相机桥接未返回有效图像，pipeline 会直接抛错并终止 run，避免产生无效数据。
+
+## SSH 无窗口调试（推荐先跑）
+如果你在服务器通过 SSH 运行且无桌面环境，先执行一次下面的调试脚本：
+
+```bash
+~/isaacsim/python.sh scripts/debug_isaac_headless.py --config configs/default.yaml
+```
+
+它会分步骤检查并生成报告（默认）：
+
+```text
+outputs/debug/isaac_headless_report.json
+```
+
+报告会明确失败在哪一步（配置、场景加载、挂载点检查、bridge warmup、首帧采集），
+用于定位“Simulation App 启动后立即关闭”的根因。
 
 偏振天空模型说明见：`docs/POLARIZATION_MODEL.md`。
 

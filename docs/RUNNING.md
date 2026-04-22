@@ -33,6 +33,12 @@ python scripts/inspect_isaac_setup.py --config configs/default.yaml --gui
 
 若 Isaac 相机桥接未返回有效图像，pipeline 会直接抛错并终止 run，避免产生无效 mock 数据。
 
+若你在 SSH 无窗口环境里遇到 “Simulation App 启动后立即关闭”，先运行：
+```bash
+python scripts/debug_isaac_headless.py --config configs/default.yaml
+```
+该脚本会输出并保存 JSON 报告（默认 `outputs/debug/isaac_headless_report.json`），逐步标记失败点（场景、prim、warmup、首帧采集）。
+
 ## 3) 输出结构（CSV）
 每个 `run_xxx` 目录包含：
 - `dataset.csv`（统一索引与真值主表）
