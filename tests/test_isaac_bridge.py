@@ -15,7 +15,7 @@ def test_bridge_raises_without_isaac_modules() -> None:
         upward_width=64,
         upward_height=64,
     )
-    with pytest.raises(RuntimeError, match="omni.replicator.core"):
+    with pytest.raises(RuntimeError, match="omni.isaac.sensor.Camera"):
         bridge.capture_stereo()
 
 
@@ -191,3 +191,30 @@ def test_orchestrator_step_disabled_by_default() -> None:
     assert bridge._enable_orchestrator_step is False
     assert bridge._default_read_retries == 60
     assert bridge._default_warmup_steps == 30
+
+
+def test_read_stereo_camera_bgr_from_current_frame(monkeypatch: pytest.MonkeyPatch) -> None:
+    bridge = IsaacSensorBridge(
+        stereo_left_prim="/World/Drone/stereo_left",
+        stereo_right_prim="/World/Drone/stereo_right",
+        upward_prim="/World/Drone/upward_cam",
+        imu_prim="/World/Drone/imu",
+        stereo_width=32,
+        stereo_height=24,
+        upward_width=64,
+        upward_height=64,
+    )
+
+    class _Cam:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get_current_frame(self):
+            self.calls += 1
+            if self.calls < 2:
+                return {"rgba": np.array([], dtype=np.float64)}
+            return {"rgba": np.zeros((2, 2, 4), dtype=np.uint8)}
+
+    monkeypatch.setattr(IsaacSensorBridge, "_step_render_pipeline_once", lambda self: None)
+    out = bridge._read_stereo_camera_bgr(_Cam(), "stereo_left", retries=3)
+    assert out.shape == (2, 2, 3)

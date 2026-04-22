@@ -32,6 +32,8 @@ class IsaacSensorBridge:
     _left_rp: Any = None
     _right_rp: Any = None
     _up_rp: Any = None
+    _left_cam: Any = None
+    _right_cam: Any = None
     _recent_errors: list[str] | None = None
     _active_annotators: dict[str, str] | None = None
     _orchestrator_warned: bool = False
@@ -110,6 +112,35 @@ class IsaacSensorBridge:
     def _init_rgb_annotators(self) -> None:
         if self._initialized:
             return
+        self._init_stereo_camera_api()
+        self._init_upward_annotator()
+        self._initialized = True
+
+    def _init_stereo_camera_api(self) -> None:
+        try:
+            from omni.isaac.sensor import Camera
+        except ImportError as exc:
+            raise RuntimeError(
+                "Isaac stereo bridge now requires omni.isaac.sensor.Camera for stereo capture."
+            ) from exc
+
+        self._left_cam = Camera(
+            prim_path=self.stereo_left_prim,
+            name="stereo_left_bridge_cam",
+            resolution=(self.stereo_width, self.stereo_height),
+        )
+        self._right_cam = Camera(
+            prim_path=self.stereo_right_prim,
+            name="stereo_right_bridge_cam",
+            resolution=(self.stereo_width, self.stereo_height),
+        )
+        for cam in (self._left_cam, self._right_cam):
+            init_fn = getattr(cam, "initialize", None)
+            if callable(init_fn):
+                init_fn()
+        self._log("initialized stereo capture via omni.isaac.sensor.Camera", force=True)
+
+    def _init_upward_annotator(self) -> None:
         try:
             import omni.replicator.core as rep
         except ImportError as exc:
@@ -118,28 +149,21 @@ class IsaacSensorBridge:
                 "Use sensors.provider=mock outside Isaac environment."
             ) from exc
 
-        left_rp = rep.create.render_product(self.stereo_left_prim, (self.stereo_width, self.stereo_height))
-        right_rp = rep.create.render_product(self.stereo_right_prim, (self.stereo_width, self.stereo_height))
         up_rp = rep.create.render_product(self.upward_prim, (self.upward_width, self.upward_height))
-        self._left_rp = left_rp
-        self._right_rp = right_rp
         self._up_rp = up_rp
 
         self._attach_records = []
         self._attach_failures = []
         self._recent_errors = []
         self._active_annotators = {}
-        self._left_ann = self._attach_annotator(rep, left_rp, "stereo_left")
-        self._right_ann = self._attach_annotator(rep, right_rp, "stereo_right")
         self._up_ann = self._attach_annotator(rep, up_rp, "upward")
         self._log(
             "render products created: "
-            f"left={self._render_product_path(left_rp)}, "
-            f"right={self._render_product_path(right_rp)}, "
+            f"left={self.stereo_left_prim} (camera_api), "
+            f"right={self.stereo_right_prim} (camera_api), "
             f"up={self._render_product_path(up_rp)}",
             force=True,
         )
-        self._initialized = True
 
     @staticmethod
     def _render_product_path(render_product: Any) -> str:
@@ -269,6 +293,8 @@ class IsaacSensorBridge:
             return
 
     def _recreate_render_product_and_annotator(self, name: str, preferred: str | None = None) -> None:
+        if name in ("stereo_left", "stereo_right"):
+            return
         try:
             import omni.replicator.core as rep
         except ImportError:
@@ -347,6 +373,31 @@ class IsaacSensorBridge:
                 self._step_render_pipeline_once()
         raise RuntimeError(f"Failed to read annotator '{name}' after {retries} retries: {last_exc}")
 
+    def _read_stereo_camera_bgr(self, camera: Any, name: str, retries: int | None = None) -> np.ndarray:
+        if retries is None:
+            retries = self._default_read_retries
+        last_exc: Exception | None = None
+        for idx in range(max(1, retries)):
+            try:
+                if hasattr(camera, "get_rgba"):
+                    return self._to_bgr(camera.get_rgba())
+                if hasattr(camera, "get_current_frame"):
+                    frame = camera.get_current_frame()
+                    if isinstance(frame, dict):
+                        for key in ("rgba", "rgb", "data", "image"):
+                            if key in frame:
+                                return self._to_bgr(frame[key])
+                if hasattr(camera, "get_rgb"):
+                    return self._to_bgr(camera.get_rgb())
+                raise RuntimeError(f"Camera API has no supported frame getter: {type(camera)!r}")
+            except Exception as exc:
+                last_exc = exc
+                self._push_error(f"{name} camera retry[{idx + 1}/{max(1, retries)}] {type(exc).__name__}: {exc}")
+                if self._retry_sleep_s > 0.0:
+                    time.sleep(self._retry_sleep_s)
+                self._step_render_pipeline_once()
+        raise RuntimeError(f"Failed to read stereo camera '{name}' after {retries} retries: {last_exc}")
+
     @staticmethod
     def _to_bgr(img: np.ndarray) -> np.ndarray:
         arr = IsaacSensorBridge._extract_array(img)
@@ -384,15 +435,15 @@ class IsaacSensorBridge:
         for _ in range(max(steps, 1)):
             self._step_render_pipeline_once()
         # Validate one fetch to ensure render products are alive.
-        _ = self._read_bgr_with_retries(self._left_ann, "stereo_left")
-        _ = self._read_bgr_with_retries(self._right_ann, "stereo_right")
+        _ = self._read_stereo_camera_bgr(self._left_cam, "stereo_left")
+        _ = self._read_stereo_camera_bgr(self._right_cam, "stereo_right")
         _ = self._read_bgr_with_retries(self._up_ann, "upward")
         self._warmed_up = True
 
     def capture_stereo(self) -> tuple[np.ndarray, np.ndarray]:
         self.warmup()
-        left = self._read_bgr_with_retries(self._left_ann, "stereo_left")
-        right = self._read_bgr_with_retries(self._right_ann, "stereo_right")
+        left = self._read_stereo_camera_bgr(self._left_cam, "stereo_left")
+        right = self._read_stereo_camera_bgr(self._right_cam, "stereo_right")
         return left, right
 
     def capture_upward(self) -> np.ndarray:
@@ -466,6 +517,7 @@ class IsaacSensorBridge:
             "left_render_product": self._render_product_path(self._left_rp) if self._left_rp is not None else "",
             "right_render_product": self._render_product_path(self._right_rp) if self._right_rp is not None else "",
             "up_render_product": self._render_product_path(self._up_rp) if self._up_rp is not None else "",
+            "stereo_capture_mode": "camera_api",
             "recent_errors": self._recent_errors or [],
             "active_annotators": self._active_annotators or {},
         }
