@@ -31,6 +31,11 @@
 > 默认配置为 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
 > 若当前不在 Isaac Python 环境中，会直接报错退出（严格 Isaac-only）。
 
+`run_batch.py` 会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致误判。
+
+> 默认配置为 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
+> 若当前不在 Isaac Python 环境中，会直接报错退出（严格 Isaac-only）。
+
 ## 快速可视化 demo（Isaac Python）
 ```bash
 ~/isaacsim/python.sh scripts/visualize_dataset.py \
@@ -79,7 +84,12 @@
 ```bash
 ~/isaacsim/python.sh scripts/run_batch.py --config configs/default.yaml --gui --num-runs 1
 ```
-用于先在可视化界面下检查场景加载和模块状态，确认后再切回无界面批量仿真。
+用于先在可视化界面下检查场景加载和模块状态，确认后再切回无界面批量仿真。  
+默认 GUI 模式下任务结束**不会立刻退出**，会保持窗口运行，按 `Ctrl+C` 再关闭（用于排查“一启动就 shutdown”）。
+如果你希望跑完自动退出，可加：
+```bash
+~/isaacsim/python.sh scripts/run_batch.py --config configs/default.yaml --gui --num-runs 1 --auto-close
+```
 若提示 `DISPLAY` 未设置，则会以 headless 运行（即使加了 `--gui`）。
 
 可用以下命令先检查环境和挂载点：

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +31,23 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Deprecated: Isaac mode is now strict by default.",
     )
+    parser.add_argument(
+        "--auto-close",
+        action="store_true",
+        help="In GUI mode, close app immediately when run finishes or errors (default keeps GUI open).",
+    )
     return parser.parse_args()
+
+
+def _hold_gui_open(sim_app) -> None:
+    print("[info] GUI hold mode enabled. Press Ctrl+C to close Isaac Sim.")
+    while True:
+        try:
+            sim_app.update()
+            time.sleep(1.0 / 60.0)
+        except KeyboardInterrupt:
+            print("[info] Ctrl+C received, closing Isaac Sim.")
+            break
 
 
 def main() -> None:
@@ -68,6 +85,15 @@ def main() -> None:
         for run_idx in range(args.num_runs):
             out_dir = pipeline.run(run_idx)
             print(f"[run {run_idx}] dataset written to: {out_dir}")
+    except Exception:
+        if sim_app is not None and args.gui and not args.auto_close:
+            print("[warn] Run failed, but keeping GUI open for debugging.")
+            _hold_gui_open(sim_app)
+        raise
+    else:
+        if sim_app is not None and args.gui and not args.auto_close:
+            print("[info] Run complete; keeping GUI open for inspection.")
+            _hold_gui_open(sim_app)
     finally:
         if sim_app is not None:
             sim_app.close()

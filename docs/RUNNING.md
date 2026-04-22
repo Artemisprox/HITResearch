@@ -20,6 +20,8 @@ python scripts/run_batch.py --config configs/default.yaml --gui --num-runs 1
 说明：
 - 该模式需要 Isaac Sim Python 环境（`omni.isaac.kit`）
 - 适合先调试场景加载与模块状态，再切回无界面批量采集
+- 默认 GUI 模式不会在 run 结束后立即退出，会保持窗口运行，按 `Ctrl+C` 关闭（用于现场排查）
+- 若需要任务结束自动退出，可加 `--auto-close`
 - 若日志提示 `DISPLAY environment variable is not set`，说明当前会话无图形显示，`--gui` 会自动退化为 headless（可通过本地桌面会话、X11 转发或设置 DISPLAY 解决）
 
 若要专门检查场景与传感器挂载点：

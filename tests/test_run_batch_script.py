@@ -18,7 +18,14 @@ def _load_module():
 
 def test_run_batch_raises_when_isaac_missing(monkeypatch) -> None:
     module = _load_module()
-    args = SimpleNamespace(config="unused.yaml", num_runs=1, seed=None, gui=False, strict_isaac=False)
+    args = SimpleNamespace(
+        config="unused.yaml",
+        num_runs=1,
+        seed=None,
+        gui=False,
+        strict_isaac=False,
+        auto_close=False,
+    )
     cfg = SimpleNamespace(
         scene=SimpleNamespace(backend="isaac"),
         sensors=SimpleNamespace(provider="isaac"),
