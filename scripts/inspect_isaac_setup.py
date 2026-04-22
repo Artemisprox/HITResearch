@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -38,19 +39,28 @@ def _print_expected_layout(cfg) -> None:
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
+    SimulationApp = None
     try:
-        from omni.isaac.kit import SimulationApp
-    except ImportError as exc:
-        print("[warn] Isaac module 'omni.isaac.kit' not found in current Python environment.")
-        print("Current config summary:")
-        print(f" - scene.backend: {cfg.scene.backend}")
-        print(f" - scene.usd_path: {cfg.scene.usd_path}")
-        print(f" - sensors.provider: {cfg.sensors.provider}")
-        _print_expected_layout(cfg)
-        print("\nTo run real Isaac inspection, execute this script inside Isaac Sim Python environment.")
-        if args.strict:
-            raise RuntimeError("Run this script in Isaac Sim Python environment.") from exc
-        return
+        from isaacsim.simulation_app import SimulationApp as _SimulationApp
+        SimulationApp = _SimulationApp
+    except ImportError:
+        try:
+            from omni.isaac.kit import SimulationApp as _SimulationApp
+            SimulationApp = _SimulationApp
+        except ImportError as exc:
+            print("[warn] Isaac module 'isaacsim/omni simulation_app' not found in current Python environment.")
+            print("Current config summary:")
+            print(f" - scene.backend: {cfg.scene.backend}")
+            print(f" - scene.usd_path: {cfg.scene.usd_path}")
+            print(f" - sensors.provider: {cfg.sensors.provider}")
+            _print_expected_layout(cfg)
+            print("\nTo run real Isaac inspection, execute this script inside Isaac Sim Python environment.")
+            if args.strict:
+                raise RuntimeError("Run this script in Isaac Sim Python environment.") from exc
+            return
+
+    if args.gui and not os.environ.get("DISPLAY"):
+        print("[warn] DISPLAY is not set; GUI request will run headless. Set DISPLAY for windowed mode.")
 
     sim_app = SimulationApp({"headless": not args.gui})
     try:

@@ -11,6 +11,8 @@ python scripts/run_batch.py --config configs/default.yaml --num-runs 5 --seed 12
 ```
 每次执行会先清理目标 `run_xxx/` 输出目录，再写入新一轮帧数据，避免读取到历史残留帧。
 当前默认是 Isaac 配置（`scene.backend: isaac` + `sensors.provider: isaac`）。
+若当前 Python 环境没有 Isaac 模块，脚本默认会自动回退到 `mock` 并继续跑（会打印 warning）。
+如需强制 Isaac（缺模块就失败），加 `--strict-isaac`。
 
 ## 2.1) 调试阶段：启用 Isaac GUI 查看模块
 ```bash
@@ -19,6 +21,7 @@ python scripts/run_batch.py --config configs/default.yaml --gui --num-runs 1
 说明：
 - 该模式需要 Isaac Sim Python 环境（`omni.isaac.kit`）
 - 适合先调试场景加载与模块状态，再切回无界面批量采集
+- 若日志提示 `DISPLAY environment variable is not set`，说明当前会话无图形显示，`--gui` 会自动退化为 headless（可通过本地桌面会话、X11 转发或设置 DISPLAY 解决）
 
 若要专门检查场景与传感器挂载点：
 ```bash

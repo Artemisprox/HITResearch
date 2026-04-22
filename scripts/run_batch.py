@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -24,6 +25,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable Isaac Sim GUI mode for scene debugging (requires Isaac environment)",
     )
+    parser.add_argument(
+        "--strict-isaac",
+        action="store_true",
+        help="Fail immediately if Isaac backend is requested but omni modules are unavailable",
+    )
     return parser.parse_args()
 
 
@@ -36,13 +42,27 @@ def main() -> None:
     sim_app = None
     need_isaac_app = cfg.scene.backend == "isaac"
     if need_isaac_app:
+        SimulationApp = None
         try:
-            from omni.isaac.kit import SimulationApp
-        except ImportError as exc:
-            raise RuntimeError(
-                "Isaac simulation requires Isaac Sim Python environment (omni.isaac.kit is missing)."
-            ) from exc
-        sim_app = SimulationApp({"headless": not args.gui})
+            from isaacsim.simulation_app import SimulationApp as _SimulationApp
+            SimulationApp = _SimulationApp
+        except ImportError:
+            try:
+                from omni.isaac.kit import SimulationApp as _SimulationApp  # backward-compat for older Isaac
+                SimulationApp = _SimulationApp
+            except ImportError as exc2:
+                if args.strict_isaac:
+                    raise RuntimeError(
+                        "Isaac simulation requires Isaac Sim Python environment (isaacsim/omni modules missing)."
+                    ) from exc2
+                print("[warn] Isaac modules missing; fallback to mock backend for this run.")
+                cfg.scene.backend = "mock"
+                cfg.sensors.provider = "mock"
+                need_isaac_app = False
+        if need_isaac_app and SimulationApp is not None:
+            if args.gui and not os.environ.get("DISPLAY"):
+                print("[warn] DISPLAY is not set; GUI request will run headless. Set DISPLAY for windowed mode.")
+            sim_app = SimulationApp({"headless": not args.gui})
 
     try:
         pipeline = SimulationPipeline(cfg)

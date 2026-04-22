@@ -18,6 +18,7 @@ python scripts/run_batch.py --config configs/default.yaml --num-runs 2 --seed 42
 `run_batch.py` 现在会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致“看起来还是旧的黑图”。
 
 > 默认配置已切到 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
+> 如果当前环境没有 Isaac 模块，`run_batch.py` 默认会自动回退到 `mock` 后继续；可加 `--strict-isaac` 强制失败。
 
 ## 快速可视化 demo
 ```bash
@@ -70,6 +71,7 @@ python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
 python scripts/run_batch.py --config configs/default.yaml --gui --num-runs 1
 ```
 用于先在可视化界面下检查场景加载和模块状态，确认后再切回无界面批量仿真。
+若提示 `DISPLAY` 未设置，则会以 headless 运行（即使加了 `--gui`）。
 
 要启用 Isaac 相机采集链路，请在配置中设置：
 ```yaml

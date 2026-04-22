@@ -27,7 +27,10 @@ class ForestScene:
 
         try:
             import omni.usd
-            from omni.isaac.core.utils.stage import open_stage
+            try:
+                from isaacsim.core.utils.stage import open_stage
+            except ImportError:
+                from omni.isaac.core.utils.stage import open_stage
         except ImportError as exc:
             raise RuntimeError(
                 "Isaac Sim Python modules are unavailable. Start with Isaac Sim Python env, "
