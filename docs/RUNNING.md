@@ -11,6 +11,8 @@ python scripts/run_batch.py --config configs/default.yaml --num-runs 5 --seed 12
 ```
 每次执行会先清理目标 `run_xxx/` 输出目录，再写入新一轮帧数据，避免读取到历史残留帧。
 当前默认是 Isaac 配置（`scene.backend: isaac` + `sensors.provider: isaac`）。
+若当前 Python 环境没有 Isaac 模块，脚本默认会自动回退到 `mock` 并继续跑（会打印 warning）。
+如需强制 Isaac（缺模块就失败），加 `--strict-isaac`。
 
 ## 2.1) 调试阶段：启用 Isaac GUI 查看模块
 ```bash
