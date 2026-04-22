@@ -54,6 +54,24 @@ class IsaacSensorBridge:
         raw = os.environ.get("HITRESEARCH_ISAAC_ORCHESTRATOR_STEP", "0")
         return raw not in ("", "0", "false", "False")
 
+    @property
+    def _default_read_retries(self) -> int:
+        raw = os.environ.get("HITRESEARCH_ISAAC_READ_RETRIES", "60")
+        try:
+            value = int(raw)
+        except ValueError:
+            value = 60
+        return max(1, value)
+
+    @property
+    def _default_warmup_steps(self) -> int:
+        raw = os.environ.get("HITRESEARCH_ISAAC_WARMUP_STEPS", "30")
+        try:
+            value = int(raw)
+        except ValueError:
+            value = 30
+        return max(1, value)
+
     def _log(self, msg: str, *, force: bool = False) -> None:
         if not (force or self._debug_enabled):
             return
@@ -274,7 +292,9 @@ class IsaacSensorBridge:
         self._step_render_pipeline_once()
         self._step_render_pipeline_once()
 
-    def _read_bgr_with_retries(self, annotator: Any, name: str, retries: int = 20) -> np.ndarray:
+    def _read_bgr_with_retries(self, annotator: Any, name: str, retries: int | None = None) -> np.ndarray:
+        if retries is None:
+            retries = self._default_read_retries
         last_exc: Exception | None = None
         half_idx = max(1, retries) // 2
         recreate_idx = max(1, (max(1, retries) * 2) // 3)
@@ -355,9 +375,11 @@ class IsaacSensorBridge:
             raise RuntimeError(f"Annotator returned empty image data: shape={rgb.shape}, dtype={rgb.dtype}")
         return rgb[..., ::-1]
 
-    def warmup(self, steps: int = 12) -> None:
+    def warmup(self, steps: int | None = None) -> None:
         if self._warmed_up:
             return
+        if steps is None:
+            steps = self._default_warmup_steps
         self._init_rgb_annotators()
         for _ in range(max(steps, 1)):
             self._step_render_pipeline_once()

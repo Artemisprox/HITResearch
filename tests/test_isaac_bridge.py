@@ -189,3 +189,5 @@ def test_orchestrator_step_disabled_by_default() -> None:
         upward_height=64,
     )
     assert bridge._enable_orchestrator_step is False
+    assert bridge._default_read_retries == 60
+    assert bridge._default_warmup_steps == 30
