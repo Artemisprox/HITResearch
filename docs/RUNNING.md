@@ -24,6 +24,8 @@ python scripts/run_batch.py --config configs/default.yaml --gui --num-runs 1
 ```bash
 python scripts/inspect_isaac_setup.py --config configs/default.yaml --gui
 ```
+如果当前环境没有 Isaac Python 模块，脚本会输出预期挂载点和运行指引（默认不报错退出）。
+需要严格失败可加 `--strict`。
 
 ## 3) 输出结构（CSV）
 每个 `run_xxx` 目录包含：

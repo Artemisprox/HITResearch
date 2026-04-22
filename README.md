@@ -79,5 +79,6 @@ sensors:
   provider: isaac
 ```
 并可用 `python scripts/inspect_isaac_setup.py --config configs/default.yaml --gui` 先检查环境和挂载点。
+若本机暂未进入 Isaac Python 环境，`inspect_isaac_setup.py` 会打印配置与预期挂载点（默认不抛异常）；可用 `--strict` 强制失败。
 
 偏振天空模型说明见：`docs/POLARIZATION_MODEL.md`。
