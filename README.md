@@ -18,7 +18,7 @@ python scripts/run_batch.py --config configs/default.yaml --num-runs 2 --seed 42
 `run_batch.py` 现在会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致“看起来还是旧的黑图”。
 
 > 默认配置已切到 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
-> 如果当前环境没有 Isaac 模块，`run_batch.py` 默认会自动回退到 `mock` 后继续；可加 `--strict-isaac` 强制失败。
+> 如果当前环境没有 Isaac 模块，`run_batch.py` 会直接报错退出（严格 Isaac-only）。
 
 ## 快速可视化 demo
 ```bash
@@ -82,6 +82,10 @@ sensors:
 ```
 并可用 `python scripts/inspect_isaac_setup.py --config configs/default.yaml --gui` 先检查环境和挂载点。
 若本机暂未进入 Isaac Python 环境，`inspect_isaac_setup.py` 会打印配置与预期挂载点（默认不抛异常）；可用 `--strict` 强制失败。
-若 Isaac 相机桥接未返回有效图像，pipeline 会自动降级到 mock 传感器，保证 run 持续并产出可检查数据。
+若 Isaac 相机桥接未返回有效图像，pipeline 会直接抛错并终止 run，避免产生无效数据。
 
 偏振天空模型说明见：`docs/POLARIZATION_MODEL.md`。
+
+## 接手文档
+- 架构与文件职责总览：`docs/HANDOVER_ARCHITECTURE_CN.md`
+
