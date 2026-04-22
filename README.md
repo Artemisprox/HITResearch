@@ -21,6 +21,24 @@
 ~/isaacsim/python.sh -m pip install -e .
 ~/isaacsim/python.sh scripts/run_batch.py --config configs/default.yaml --num-runs 2 --seed 42
 ```
+`run_batch.py` 现在会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致“看起来还是旧的黑图”。
+
+> 默认配置已切到 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
+> 如果当前环境没有 Isaac 模块，`run_batch.py` 会直接报错退出（严格 Isaac-only）。
+
+`run_batch.py` 会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致误判。
+
+> 默认配置为 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
+> 若当前不在 Isaac Python 环境中，会直接报错退出（严格 Isaac-only）。
+
+`run_batch.py` 会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致误判。
+
+`run_batch.py` 会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致误判。
+
+> 默认配置为 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
+> 若当前不在 Isaac Python 环境中，会直接报错退出（严格 Isaac-only）。
+
+`run_batch.py` 会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致误判。
 
 `run_batch.py` 会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致误判。
 
