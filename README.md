@@ -38,6 +38,11 @@
 > 默认配置为 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
 > 若当前不在 Isaac Python 环境中，会直接报错退出（严格 Isaac-only）。
 
+`run_batch.py` 会在每次运行前清理对应 `run_xxx/` 目录，避免旧帧残留导致误判。
+
+> 默认配置为 Isaac 采集链路（`scene.backend: isaac` + `sensors.provider: isaac`）。
+> 若当前不在 Isaac Python 环境中，会直接报错退出（严格 Isaac-only）。
+
 ## 快速可视化 demo（Isaac Python）
 ```bash
 ~/isaacsim/python.sh scripts/visualize_dataset.py \

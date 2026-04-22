@@ -25,6 +25,28 @@ class IsaacSensorBridge:
     _imu_warned: bool = False
     _warmed_up: bool = False
 
+    @staticmethod
+    def _extract_array(data: Any) -> np.ndarray:
+        payload = data
+        if isinstance(payload, dict):
+            for key in ("data", "rgb", "image"):
+                if key in payload:
+                    payload = payload[key]
+                    break
+
+        if payload is None:
+            raise RuntimeError("Annotator returned no image data.")
+
+        if hasattr(payload, "numpy"):
+            payload = payload.numpy()
+
+        try:
+            arr = np.asarray(payload)
+        except Exception as exc:  # pragma: no cover - depends on Isaac runtime object type
+            raise RuntimeError(f"Unable to convert annotator output to ndarray: {type(payload)!r}") from exc
+
+        return arr
+
     def _init_rgb_annotators(self) -> None:
         if self._initialized:
             return
@@ -50,13 +72,28 @@ class IsaacSensorBridge:
 
     @staticmethod
     def _to_bgr(img: np.ndarray) -> np.ndarray:
-        if img is None:
-            raise RuntimeError("Annotator returned no image data.")
-        if img.ndim != 3:
-            raise ValueError(f"Unexpected annotator image shape: {img.shape}")
-        rgb = img[..., :3].astype(np.uint8)
+        arr = IsaacSensorBridge._extract_array(img)
+        if arr.dtype.itemsize == 0:
+            raise RuntimeError(
+                f"Annotator returned unsupported dtype with zero itemsize: {arr.dtype!r}, shape={arr.shape}"
+            )
+
+        if arr.ndim != 3:
+            raise ValueError(f"Unexpected annotator image shape: {arr.shape}, dtype={arr.dtype}")
+
+        if arr.shape[-1] < 3:
+            raise RuntimeError(f"Annotator returned insufficient channels: shape={arr.shape}, dtype={arr.dtype}")
+
+        rgb = arr[..., :3]
+        if rgb.dtype.kind == "f":
+            if rgb.size == 0:
+                raise RuntimeError(f"Annotator returned empty float image data: shape={rgb.shape}, dtype={rgb.dtype}")
+            scale = 255.0 if float(np.nanmax(rgb)) <= 1.0 else 1.0
+            rgb = np.clip(rgb * scale, 0.0, 255.0)
+
+        rgb = rgb.astype(np.uint8)
         if rgb.size == 0:
-            raise RuntimeError("Annotator returned empty image data.")
+            raise RuntimeError(f"Annotator returned empty image data: shape={rgb.shape}, dtype={rgb.dtype}")
         return rgb[..., ::-1]
 
     def warmup(self, steps: int = 4) -> None:

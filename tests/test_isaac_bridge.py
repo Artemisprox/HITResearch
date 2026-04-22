@@ -41,3 +41,16 @@ def test_to_bgr_validates_input() -> None:
     arr = np.zeros((4, 4, 4), dtype=np.uint8)
     out = IsaacSensorBridge._to_bgr(arr)
     assert out.shape == (4, 4, 3)
+
+
+def test_to_bgr_accepts_dict_float_payload() -> None:
+    payload = {"data": np.ones((2, 3, 4), dtype=np.float32) * 0.5}
+    out = IsaacSensorBridge._to_bgr(payload)
+    assert out.shape == (2, 3, 3)
+    assert out.dtype == np.uint8
+
+
+def test_to_bgr_rejects_zero_itemsize_dtype() -> None:
+    arr = np.empty((2, 2, 4), dtype=np.dtype("V0"))
+    with pytest.raises(RuntimeError, match="zero itemsize"):
+        IsaacSensorBridge._to_bgr(arr)

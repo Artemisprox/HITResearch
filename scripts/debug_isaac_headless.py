@@ -44,6 +44,7 @@ def main() -> None:
         "steps": [],
         "ok": False,
     }
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     sim_app = None
     try:
