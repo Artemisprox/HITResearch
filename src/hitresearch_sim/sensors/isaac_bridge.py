@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -35,10 +36,25 @@ class IsaacSensorBridge:
     _up_rp: Any = None
     _recent_errors: list[str] | None = None
     _active_annotators: dict[str, str] | None = None
+    _orchestrator_warned: bool = False
 
     @property
     def _debug_enabled(self) -> bool:
         return os.environ.get("HITRESEARCH_ISAAC_DEBUG", "0") not in ("", "0", "false", "False")
+
+    @property
+    def _retry_sleep_s(self) -> float:
+        raw = os.environ.get("HITRESEARCH_ISAAC_RETRY_SLEEP_MS", "20")
+        try:
+            value = float(raw)
+        except ValueError:
+            value = 20.0
+        return max(0.0, value / 1000.0)
+
+    @property
+    def _enable_orchestrator_step(self) -> bool:
+        raw = os.environ.get("HITRESEARCH_ISAAC_ORCHESTRATOR_STEP", "1")
+        return raw not in ("", "0", "false", "False")
 
     def _log(self, msg: str, *, force: bool = False) -> None:
         if not (force or self._debug_enabled):
@@ -199,6 +215,19 @@ class IsaacSensorBridge:
             return
         omni.kit.app.get_app().update()
 
+    def _step_render_pipeline_once(self) -> None:
+        self._update_app_once()
+        if not self._enable_orchestrator_step:
+            return
+        try:
+            import omni.replicator.core as rep
+            rep.orchestrator.step()
+        except Exception as exc:  # pragma: no cover - depends on Isaac runtime
+            if not self._orchestrator_warned:
+                self._push_error(f"orchestrator step failed once: {exc}")
+                self._log(f"orchestrator step failed once: {exc}", force=True)
+                self._orchestrator_warned = True
+
     @staticmethod
     def _is_transient_frame_error(exc: Exception) -> bool:
         text = str(exc).lower()
@@ -251,8 +280,8 @@ class IsaacSensorBridge:
         else:
             return
         self._log(f"recreated render product + annotator for {name}", force=True)
-        self._update_app_once()
-        self._update_app_once()
+        self._step_render_pipeline_once()
+        self._step_render_pipeline_once()
 
     def _read_bgr_with_retries(self, annotator: Any, name: str, retries: int = 20) -> np.ndarray:
         last_exc: Exception | None = None
@@ -302,7 +331,9 @@ class IsaacSensorBridge:
                     }.get(name, None)
                     if next_ann is not None:
                         annotator = next_ann
-                self._update_app_once()
+                if self._retry_sleep_s > 0.0:
+                    time.sleep(self._retry_sleep_s)
+                self._step_render_pipeline_once()
         raise RuntimeError(f"Failed to read annotator '{name}' after {retries} retries: {last_exc}")
 
     @staticmethod
@@ -333,12 +364,12 @@ class IsaacSensorBridge:
             raise RuntimeError(f"Annotator returned empty image data: shape={rgb.shape}, dtype={rgb.dtype}")
         return rgb[..., ::-1]
 
-    def warmup(self, steps: int = 4) -> None:
+    def warmup(self, steps: int = 12) -> None:
         if self._warmed_up:
             return
         self._init_rgb_annotators()
         for _ in range(max(steps, 1)):
-            self._update_app_once()
+            self._step_render_pipeline_once()
         # Validate one fetch to ensure render products are alive.
         if self._left_ann is not None and self._right_ann is not None:
             _ = self._read_bgr_with_retries(self._left_ann, "stereo_left")

@@ -78,7 +78,7 @@ def test_read_bgr_with_retries_eventually_succeeds(monkeypatch: pytest.MonkeyPat
                 raise RuntimeError("temporary annotator failure")
             return np.zeros((2, 2, 4), dtype=np.uint8)
 
-    monkeypatch.setattr(IsaacSensorBridge, "_update_app_once", staticmethod(lambda: None))
+    monkeypatch.setattr(IsaacSensorBridge, "_step_render_pipeline_once", lambda self: None)
     out = bridge._read_bgr_with_retries(_Ann(), "test", retries=4)
     assert out.shape == (2, 2, 3)
 
@@ -129,7 +129,7 @@ def test_read_bgr_with_retries_can_recover_after_transient_empty_frame(monkeypat
                 return np.array([], dtype=np.float64)
             return np.zeros((2, 2, 4), dtype=np.uint8)
 
-    monkeypatch.setattr(IsaacSensorBridge, "_update_app_once", staticmethod(lambda: None))
+    monkeypatch.setattr(IsaacSensorBridge, "_step_render_pipeline_once", lambda self: None)
     monkeypatch.setattr(IsaacSensorBridge, "_reattach_annotator", lambda self, _name, preferred=None: None)
     out = bridge._read_bgr_with_retries(_Ann(), "stereo_left", retries=5)
     assert out.shape == (2, 2, 3)
@@ -152,7 +152,7 @@ def test_read_retries_attempts_recreate_pipeline(monkeypatch: pytest.MonkeyPatch
             return np.array([], dtype=np.float64)
 
     calls = {"reattach": 0, "recreate": 0}
-    monkeypatch.setattr(IsaacSensorBridge, "_update_app_once", staticmethod(lambda: None))
+    monkeypatch.setattr(IsaacSensorBridge, "_step_render_pipeline_once", lambda self: None)
     monkeypatch.setattr(
         IsaacSensorBridge,
         "_reattach_annotator",
