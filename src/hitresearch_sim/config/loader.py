@@ -26,11 +26,14 @@ def load_config(path: str | Path) -> AppConfig:
     merged = _merge(raw, user_cfg)
     run_cfg = merged["run"]
     run_cfg["output_root"] = Path(run_cfg["output_root"])
+    scene_cfg = merged["scene"]
+    if scene_cfg.get("usd_path") is not None:
+        scene_cfg["usd_path"] = Path(scene_cfg["usd_path"])
 
     return AppConfig(
         run=RunConfig(**run_cfg),
         sensors=SensorConfig(**merged["sensors"]),
-        scene=SceneConfig(**merged["scene"]),
+        scene=SceneConfig(**scene_cfg),
         geo=GeoConfig(**merged["geo"]),
         polarization=PolarizationConfig(**merged["polarization"]),
     )

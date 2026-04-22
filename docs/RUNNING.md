@@ -54,7 +54,21 @@ python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
 如果 `rviz_demo_bag/` 已存在，默认会自动创建 `rviz_demo_bag_001` 等新目录；要覆盖原目录请加 `--overwrite`。
 
 ## 6) 接入 Isaac Sim / Pegasus
-当前 `ForestScene` 与各 `Sensor` 是 mock 接口：
-- 把 `scenes/forest_scene.py` 的 `load()` 替换为实际 USD 场景加载
+`ForestScene` 现在支持两种后端：
+- `scene.backend: mock`（默认）
+- `scene.backend: isaac`（会实际调用 Isaac Sim 的 `open_stage()` 载入 USD）
+
+示例配置（YAML）：
+```yaml
+scene:
+  backend: isaac
+  usd_path: /path/to/forest_scene.usd
+```
+
+注意：
+- 请在 Isaac Sim Python 环境中运行（能 import `omni.usd` 和 `omni.isaac.core`）
+- 若未配置 `usd_path` 或文件不存在会直接报错
+
+其余模块仍是 mock 接口，建议逐步替换：
 - 把 `sensors/*.py` 的 `capture()/sample()` 替换为 Pegasus 传感器 API
 - `polarization/lut.py` 中 `build()` 替换为 libRadtran 真实调用与解析

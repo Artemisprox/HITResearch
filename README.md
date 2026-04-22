@@ -58,4 +58,4 @@ python scripts/demo_to_rviz_bag.py --config configs/default.yaml --bag-version 9
 - `scripts`：批处理入口与可视化脚本
 
 ## 说明
-当前版本提供可运行工程框架与 mock 管线（便于替换成 Isaac/Pegasus 实际 API）。
+当前版本提供可运行工程框架与 mock 管线，并支持通过 `scene.backend: isaac` + `scene.usd_path` 直接加载森林 USD 场景。

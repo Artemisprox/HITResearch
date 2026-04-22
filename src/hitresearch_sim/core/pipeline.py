@@ -20,7 +20,11 @@ from hitresearch_sim.sensors.upward_camera import UpwardCamera
 class SimulationPipeline:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-        self.scene = ForestScene(config.scene.map_name)
+        self.scene = ForestScene(
+            config.scene.map_name,
+            backend=config.scene.backend,
+            usd_path=config.scene.usd_path,
+        )
         self.traj = TrajectoryGenerator(
             radius_m=config.scene.area_radius_m,
             min_alt_m=config.scene.min_altitude_m,
